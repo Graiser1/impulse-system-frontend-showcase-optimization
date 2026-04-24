@@ -1,0 +1,22 @@
+{
+  "nodes":[
+      {
+        "id": "90161ae2-f24a-4924-bc41-16a3381f1513",
+        "text": "Napoleon",
+        "value": 100
+      },
+      {
+        "id": "bae83dc4-04ac-40fd-9346-1bf81d568a47",
+        "text": "Myriel",
+        "value": 666
+      }
+  ],
+  "links":[
+    {
+      "source": "90161ae2-f24a-4924-bc41-16a3381f1513",
+      "target": "bae83dc4-04ac-40fd-9346-1bf81d568a47",
+      "value": 1,
+      "label": 1
+    }
+  ]
+}

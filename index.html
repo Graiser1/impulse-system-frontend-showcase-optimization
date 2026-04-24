@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+    <link rel="stylesheet" href="./styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+
+<!-- Load d3.js -->
+<script src="./d3.v7.js"></script>
+<body id="body">
+<header>
+    <div id="top-menu">
+        <div id="statusContainer">
+            <span style="background-color: red;">status: </span>
+            <span id="status" style="background-color: red;">status</span>
+        </div>
+        <button id="returnEditNetworkButton">вернуться к редактированию графа</button>
+        <div id="network-edit-menu">
+            <button id="addNewNodeButton">
+                Добавить вершину
+            </button>
+            <button id="addNewLinkButton">
+                Добавить ребро
+            </button>
+            <button id="editNodeButton">
+                Редактировать элемент
+            </button>
+
+            <div class="slidecontainer" style="align-self: center; text-align: center">
+                <label for="rangeSlider">радиус вершин</label>
+                <input id="rangeSlider" type="range" min="1" max="100" value="50" class="slider">
+            </div>
+
+            <button id="submitBuiltNetworkButton">
+                Закончить построение графа
+            </button>
+            <a href="graphic.html" class="goToLink">
+                <button id="goTo">
+                    submit built network & create graphic
+                </button>
+            </a>
+        </div>
+        <div id="userTopMenu">
+            <button id="loginButton" style="visibility: hidden;">войти</button>
+            <button id="registerButton" style="visibility: hidden;">зарегистрироваться</button>
+            <button id="load_button">загрузить из файла</button>
+            <button id="save_button">сохранить в файл</button>
+            <!-- Скрытый input для выбора файла -->
+            <input type="file" id="fileInput" accept=".json" style="display: none;" />
+            <div id="userTopMenuSelect">
+                <select id="networkSelect"></select>
+                <button id="openSelectedNetworkButton">открыть этот граф</button>
+            </div>
+            <div id="userTopMenuSave">
+                <div id="networkNameInputContainer"><label for="networkNameInput">имя графа</label>
+                    <input id="networkNameInput" type="text"></div>
+                <button id="networkSaveButton">сохранить этот граф</button>
+            </div>
+        </div>
+
+    </div>
+</header>
+<div class="main" id="main">
+    <button style="position: absolute" id="testButton">
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        test button
+    </button>
+    <div id="container"></div>
+    <div id="impulseChartContainer"></div>
+    <div class="impulseEditor" id="impulseEditor">
+        <div class="impulseEditor-header">
+            <span id="totalImpulseStepsSpan">Количество шагов: </span>
+            <button id="impulseAddStepButton">+</button>
+            <button id="impulseRemoveStepButton">-</button>
+            <button id="impulseSubmitButton">закончить ввод импульсов</button>
+            <div id="impulseForNodeContainer">
+                <button id="impulseAddNodeButton">добавить импульс к:</button>
+
+                <br>
+                <select style="width: 100%;" id="nodeForImpulseSelect"></select>
+            </div>
+            <div id="doImpuleStepContainer">
+                <button id="doImpulseStepButton">выполнить шаг</button>
+                <br>
+                <span id="impulseStepSpan">номер текущего шага: 0</span>
+            </div>
+        </div>
+        <div id="impulseInputContainer"></div>
+    </div>
+</div>
+
+<!-- The form -->
+<div class="form-popup" id="myForm">
+    <form action="/action_page.php" class="form-container">
+        <h1>Edit node</h1>
+
+        <label for="editNodeNameInput"><b>Node name</b></label>
+        <input id="editNodeNameInput" type="text" placeholder="Enter node name" name="nodeName" required>
+
+        <label for="editNodeValueInput"><b>Node value</b></label>
+        <input id="editNodeValueInput" type="number" placeholder="Enter node value" name="nodeValue" required>
+
+        <button id="submitEditNodeButton" type="button" class="btn">Submit</button>
+        <button id="deleteNodeButton" type="button" class="btn">Delete</button>
+        <button id="editNodeCloseButton" type="button" class="btn cancel">Close</button>
+    </form>
+</div>
+
+<!-- Edit link form -->
+<div class="form-popup" id="linkForm" style="display: none">
+    <form action="/action_page.php" class="form-container">
+        <h1>Edit link</h1>
+
+        <label for="editLinkNameInput"><b>Link name</b></label>
+        <input id="editLinkNameInput" type="text" placeholder="Enter node name" name="nodeName" required>
+
+        <label for="editLinkValueInput"><b>Link value</b></label>
+        <input id="editLinkValueInput" type="number" placeholder="Enter node value" name="nodeValue" required>
+
+        <button id="submitEditLinkButton" type="button" class="btn">Submit</button>
+        <button id="deleteLinkButton" type="button" class="btn">Delete</button>
+        <button id="editLinkCloseButton" type="button" class="btn cancel">Close</button>
+    </form>
+</div>
+
+<!-- The Login Form -->
+<div class="form-popup" id="LoginForm">
+    <form action="/action_page.php" class="form-container">
+        <h1>Login</h1>
+
+        <span id="loginFormStatus"></span> <br>
+
+        <label for="signInLoginInput"><b>Login</b></label>
+        <input id="signInLoginInput" type="text" placeholder="Enter login" name="signInUserLogin" required>
+
+        <label for="signInPasswordInput"><b>Password</b></label>
+        <input id="signInPasswordInput" type="password" placeholder="Enter password" name="signInUserPassword" required>
+
+        <button id="submitLoginButton" type="button" class="btn">Submit</button>
+    </form>
+</div>
+
+<!-- The Register Form -->
+<div class="form-popup" id="RegisterForm">
+    <form action="/action_page.php" class="form-container">
+        <h1>Register</h1>
+
+        <span id="registerFormStatus"></span> <br>
+
+        <label for="signUpLoginInput"><b>Login</b></label>
+        <input id="signUpLoginInput" type="text" placeholder="Enter login" name="signUpUserLogin" required>
+
+        <label for="signUpPasswordInput"><b>Password</b></label>
+        <input id="signUpPasswordInput" type="password" placeholder="Enter password" name="signUpUserPassword" required>
+
+        <button id="submitRegisterButton" type="button" class="btn">Submit</button>
+    </form>
+</div>
+
+    <script type="module" src="./createScript.js"></script>
+</body>
+
+

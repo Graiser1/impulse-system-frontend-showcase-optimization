@@ -33,6 +33,27 @@ svg{
   border: 1px solid black;
 }
 
+.circle-label,
+.circle-value {
+  fill: #fff8d7;
+  font-weight: 800;
+  paint-order: stroke;
+  pointer-events: auto;
+  stroke: rgba(0, 0, 0, 0.42);
+  stroke-linejoin: round;
+  text-anchor: middle;
+}
+
+.circle-label {
+  font-size: 11px;
+  stroke-width: 1px;
+}
+
+.circle-value {
+  font-size: 13px;
+  stroke-width: 1.2px;
+}
+
 .main{
   display: block;
   flex-direction: row;
@@ -64,6 +85,19 @@ body {
 
 #top-menu button, input, select{
   align-self: center;
+}
+
+.layout-lock-control {
+  align-self: center;
+  color: #111;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.layout-lock-control input {
+  width: auto;
 }
 
 #network-edit-menu{
@@ -285,4 +319,3 @@ th {
   background-color: #4CAF50;
   color: white;
 }
-

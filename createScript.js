@@ -62,6 +62,7 @@ var impulseSteps = 0
 var loggedUser = null
 
 var nodeRadius = 40
+var isLayoutLocked = true
 
 function setStatusText() {
     if (statusFlag == statusFlagConstants.idle) statusText.innerHTML = "idle";
@@ -89,23 +90,110 @@ console.log(color)
 var links = data.links.map(d => ({ ...d }));
 var nodes = data.nodes.map(d => ({ ...d }));
 
+spreadInitialNodes();
+
+function getNodeId(nodeOrId) {
+    return typeof nodeOrId === "object" && nodeOrId !== null ? nodeOrId.id : nodeOrId;
+}
+
+function getLinkSourceId(link) {
+    return getNodeId(link.source);
+}
+
+function getLinkTargetId(link) {
+    return getNodeId(link.target);
+}
+
+function serializeGraph() {
+    return {
+        nodes: nodes.map(node => ({ ...node, fx: null, fy: null })),
+        links: links.map(link => ({
+            source: getLinkSourceId(link),
+            target: getLinkTargetId(link),
+            value: Number(link.value),
+            label: link.label ?? String(link.value)
+        }))
+    };
+}
+
+function getLinkColor(link) {
+    return Number(link.value) > 0 ? "green" : "red";
+}
+
+function getLinkMarkerId(link) {
+    return Number(link.value) > 0 ? "arrowhead-positive" : "arrowhead-negative";
+}
+
+function spreadInitialNodes() {
+    if (nodes.length < 2) return;
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) * 0.34;
+    const angleOffset = -Math.PI / 2;
+
+    nodes.forEach((node, index) => {
+        const angle = angleOffset + (2 * Math.PI * index) / nodes.length;
+        node.x = centerX + radius * Math.cos(angle);
+        node.y = centerY + radius * Math.sin(angle);
+        node.vx = 0;
+        node.vy = 0;
+        node.fx = null;
+        node.fy = null;
+    });
+}
+
+function fixNodePosition(node) {
+    if (node.x == null) node.x = width / 2;
+    if (node.y == null) node.y = height / 2;
+    node.fx = node.x;
+    node.fy = node.y;
+}
+
+function releaseNodePosition(node) {
+    node.fx = null;
+    node.fy = null;
+}
+
+function applyLayoutMode() {
+    if (isLayoutLocked) {
+        nodes.forEach(fixNodePosition);
+        if (simulation) {
+            simulation.alphaTarget(0).stop();
+        }
+        ticked();
+        return;
+    }
+
+    nodes.forEach(releaseNodePosition);
+    if (simulation) {
+        simulation.alpha(0.6).restart();
+    }
+}
+
 let maxNodeValue = 0
-let minNodeValue = 9999999
+let minNodeValue = 0
 
 function updateMinMaxNodeValue(){
+    maxNodeValue = nodes.length ? Number(nodes[0].value) : 0
+    minNodeValue = nodes.length ? Number(nodes[0].value) : 0
     nodes.forEach(element =>{
-        if (element.value>maxNodeValue) maxNodeValue = element.value
-        if (element.value<minNodeValue) minNodeValue = element.value
+        let value = Number(element.value)
+        if (value>maxNodeValue) maxNodeValue = value
+        if (value<minNodeValue) minNodeValue = value
     })
 }
 
 let maxLinkValue = 0
-let minLinkValue = 9999999
+let minLinkValue = 0
 
 function updateMinMaxLinkValue(){
+    maxLinkValue = links.length ? Number(links[0].value) : 0
+    minLinkValue = links.length ? Number(links[0].value) : 0
     links.forEach(element =>{
-        if (element.value>maxLinkValue) maxLinkValue = element.value
-        if (element.value<minLinkValue) minLinkValue = element.value
+        let value = Number(element.value)
+        if (value>maxLinkValue) maxLinkValue = value
+        if (value<minLinkValue) minLinkValue = value
     })
     console.log(minLinkValue+" "+maxLinkValue)
 }
@@ -141,6 +229,26 @@ var svg = d3.create("svg")
     .on("click", svgClicked)
 
 // Добавляем SVG элемент для маркера стрелки
+const defs = svg.append("defs")
+
+function createArrowMarker(id, markerColor) {
+    defs.append("marker")
+        .attr("id", id)
+        .attr("viewBox", "0 0 10 10")
+        .attr("refX", 35)
+        .attr("refY", 5)
+        .attr("markerWidth", 7)
+        .attr("markerHeight", 7)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M 0 0 L 10 5 L 0 10 Z")
+        .attr("fill", markerColor)
+}
+
+createArrowMarker("arrowhead-positive", "green")
+createArrowMarker("arrowhead-negative", "red")
+
+/*
 svg.append("defs").append("marker")
     .attr("id", "arrowhead")
     .attr("viewBox", "0 0 10 10")
@@ -153,16 +261,17 @@ svg.append("defs").append("marker")
     .attr("d", "M 0 0 L 10 5 L 0 10 Z") // Треугольная стрелка
     .attr("fill", "#999")
     .on("click", editLink)
+*/
 
 // Добавляем линии для рёбер
 var link = svg.append("g")
     .selectAll("line")
     .data(links)
     .join("line")
-    .attr("stroke", d => color((d.value-minLinkValue)/(maxLinkValue-minLinkValue+1)))
+    .attr("stroke", getLinkColor)
     .attr("stroke-opacity", 0.6)
     .attr("stroke-width", 2)
-    .attr("marker-end", "url(#arrowhead)")
+    .attr("marker-end", d => `url(#${getLinkMarkerId(d)})`)
     .on("click", editLink)
 ; // Используем маркер стрелки
 
@@ -172,12 +281,13 @@ function updateLineView() {
         .data(links)
         .join(
             enter => enter.append("line")
-            .attr("stroke", d => color((d.value-minLinkValue)/(maxLinkValue-minLinkValue+1)))
+            .attr("stroke", getLinkColor)
                 .attr("stroke-width", 2)
-                .attr("marker-end", "url(#arrowhead)")
+                .attr("marker-end", d => `url(#${getLinkMarkerId(d)})`)
                 .on("click", editLink),// Инициализация новых элементов
             update => update.attr("stroke-width", 2)
-                .attr("marker-end", "url(#arrowhead)"), // Обновление существующих элементов
+                .attr("stroke", getLinkColor)
+                .attr("marker-end", d => `url(#${getLinkMarkerId(d)})`), // Обновление существующих элементов
             exit => exit.remove() // Удаление вышедших элементов
         );
         console.log(nodes)
@@ -187,8 +297,8 @@ function updateLineView() {
 }
 
 var node = svg.append("g")
-    .attr("stroke", "#fff")
-    .attr("stroke-width", 1.5)
+    .attr("stroke", "none")
+    .attr("stroke-width", 0)
     .selectAll()
     .data(nodes)
     .join("circle")
@@ -235,17 +345,12 @@ function updateLinkTextView(){
 var circlesText = svg.append("g")
     .selectAll("text")
     .data(nodes)
-    .attr("stroke", "#1f77b4")
-    .attr("stroke-width", 10)
     .join("text")
-    .attr("fill", "#f1f1f1")
-    .attr("class", "circle-text")
+    .attr("class", "circle-label")
     .each(function(d) {
         var words = d.text.split(' ');
         words.forEach((word, i) => {
             d3.select(this).append('tspan')
-                .attr("stroke", "black")
-                .attr("stroke-width", 0.4)
                 .attr('x', d => d.x)
                 .attr('dy', i == 0 ? '0em' : '1.0em')
                 .text(word);
@@ -257,17 +362,13 @@ function updateCirclesTextView() {
     circlesText = circlesText
         .data(nodes)
         .join("text")
-        .attr("stroke", "black")
-        .attr("stroke-width", 0.4)
-        .attr("class", "circle-text")
+        .attr("class", "circle-label")
         .each(function(d) {
             // Очистка старых tspan элементов
             d3.select(this).selectAll('tspan').remove();
             var words = d.text.split(' ');
             words.forEach((word, i) => {
                 d3.select(this).append('tspan')
-                    .attr("stroke", "black")
-                    .attr("stroke-width", 0.4)
                     .attr('x', d => d.x)
                     .attr('dy', i == 0 ? '0em' : '1.0em')
                     .text(word);
@@ -281,7 +382,7 @@ var circlesValueText = svg.append("g")
     .selectAll("text")
     .data(nodes)
     .join("text")
-    .attr("class", "circle-text")
+    .attr("class", "circle-value")
     .text(d => d.value)
     .on("click", nodeClicked);
 
@@ -289,7 +390,7 @@ function updateCirclesValueTextView() {
     circlesValueText = circlesValueText
         .data(nodes)
         .join("text")
-        .attr("class", "circle-text")
+        .attr("class", "circle-value")
         .text(d => d.value)
         .on("click", nodeClicked);
 }
@@ -315,6 +416,8 @@ circlesValueText.call(d3.drag()
     .on("drag", dragged)
     .on("end", dragended))
 
+applyLayoutMode()
+
 // Set the position attributes of links and nodes each time the simulation ticks.
 function ticked() {
     link
@@ -330,13 +433,13 @@ function ticked() {
     linkText.attr("x", d => (d.source.x + d.target.x) / 2)
         .attr("y", d => (d.source.y + d.target.y) / 2);
 
+    circlesText.attr("x", d => d.x)
+        .attr("y", d => d.y-8);
+
     circlesText.selectAll('tspan')
-        .attr('x', function(d) {
+        .attr('x', function() {
             return d3.select(this.parentNode).attr('x');
         });
-
-    circlesText.attr("x", d => d.x-20)
-        .attr("y", d => d.y-8);
 
     circlesValueText.attr("x", d => d.x - 10)
         .attr("y", d => d.y+18);
@@ -344,38 +447,52 @@ function ticked() {
 
 // Reheat the simulation when drag starts, and fix the subject position.
 function dragstarted(event) {
-    if (!event.active) simulation.alphaTarget(0.3).restart();
+    if (!event.active && !isLayoutLocked) simulation.alphaTarget(0.3).restart();
     event.subject.fx = event.subject.x;
     event.subject.fy = event.subject.y;
 }
 
 // Update the subject (dragged node) position during drag.
 function dragged(event) {
+    event.subject.x = event.x;
+    event.subject.y = event.y;
     event.subject.fx = event.x;
     event.subject.fy = event.y;
+    if (isLayoutLocked) ticked();
 }
 
 // Restore the target alpha so the simulation cools after dragging ends.
 // Unfix the subject position now that it’s no longer being dragged.
 function dragended(event) {
     if (!event.active) simulation.alphaTarget(0);
-    event.subject.fx = null;
-    event.subject.fy = null;
+    event.subject.x = event.x;
+    event.subject.y = event.y;
+    if (isLayoutLocked) {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+        ticked();
+    } else {
+        event.subject.fx = null;
+        event.subject.fy = null;
+    }
 }
 
 function editLink(event){
     if(statusFlag != statusFlagConstants.editNodeStarted) return
     console.log("hello")
-    let tempLink = event.srcElement.__data__
+    let tempLink = event.currentTarget.__data__
     tempLinkForEdit = tempLink
     document.getElementById("editLinkValueInput").value = tempLinkForEdit.value
     document.getElementById("linkForm").style.display = "block"
 }
 
 submitEditLinkButton.addEventListener("click", () => {
+    const sourceId = getLinkSourceId(tempLinkForEdit)
+    const targetId = getLinkTargetId(tempLinkForEdit)
     links.forEach(element => {
-        if(element.source == tempLinkForEdit.source && element.target == tempLinkForEdit.target){
-            element.value = document.getElementById("editLinkValueInput").value;
+        if(getLinkSourceId(element) == sourceId && getLinkTargetId(element) == targetId){
+            element.value = Number(document.getElementById("editLinkValueInput").value);
+            element.label = String(element.value);
         }
     })
     document.getElementById("linkForm").style.display = "none"
@@ -461,7 +578,7 @@ function clicked(event) {
 function svgClicked(event) {
     if (statusFlag == statusFlagConstants.addNodeStart) {
         mousemoved.call(this, event);
-        spawn({ id: uuidv4(), group: 1, text:"New Edge",  x: mouse.x, y: mouse.y , value: 1});
+        spawn({ id: uuidv4(), group: 1, text:"New Node",  x: mouse.x, y: mouse.y , value: 1});
         statusFlag = statusFlagConstants.idle
         setStatusText()
     }
@@ -483,7 +600,7 @@ deleteNodeButton.addEventListener('click', () => {
     nodes = nodes.filter(node => node.id !== tempNodeForEdit.id);
     console.log("links before")
     console.log(links)
-    links = links.filter(link => (link.source.id !== tempNodeForEdit.id) && (link.target.id !== tempNodeForEdit.id));
+    links = links.filter(link => (getLinkSourceId(link) !== tempNodeForEdit.id) && (getLinkTargetId(link) !== tempNodeForEdit.id));
     console.log("links after")
     console.log(links)
     /*
@@ -496,31 +613,32 @@ deleteNodeButton.addEventListener('click', () => {
       }
     )*/
     statusFlag = statusFlagConstants.idle
-    setStatusText
+    setStatusText()
     document.getElementById("myForm").style.display = "none"
     reRender()
 })
 
 function nodeClicked(event) {
+    const nodeData = event.currentTarget.__data__
     console.log(event)
-    console.log(event.srcElement.__data__)
-    console.log((event.srcElement.__data__.value-minNodeValue)/(maxNodeValue-minNodeValue+1))
+    console.log(nodeData)
+    console.log((nodeData.value-minNodeValue)/(maxNodeValue-minNodeValue+1))
     if (statusFlag == statusFlagConstants.addLinkStart) {
-        firstNodeForLink = event.srcElement.__data__
+        firstNodeForLink = nodeData
         statusFlag = statusFlagConstants.addLinkFirstSelected
         setStatusText()
-        console.log(event.srcElement.__data__)
+        console.log(nodeData)
         return
     }
     if (statusFlag == statusFlagConstants.addLinkFirstSelected) {
-        secondNodeForLink = event.srcElement.__data__
+        secondNodeForLink = nodeData
         addNewLink()
         statusFlag = statusFlagConstants.idle
         setStatusText()
         return
     }
     if (statusFlag == statusFlagConstants.editNodeStarted) {
-        var tempNode = event.srcElement.__data__
+        var tempNode = nodeData
         tempNodeForEdit = tempNode
         document.getElementById("editNodeNameInput").value = tempNode.text
         document.getElementById("editNodeValueInput").value = tempNode.value
@@ -535,10 +653,15 @@ function nodeClicked(event) {
 function mousemoved(event) {
     const [x, y] = d3.pointer(event);
     mouse = { x, y };
-    simulation.alpha(0.3).restart();
+    if (!isLayoutLocked) {
+        simulation.alpha(0.3).restart();
+    }
 }
 
 function spawn(source) {
+    if (isLayoutLocked) {
+        fixNodePosition(source)
+    }
     nodes.push(source);
 
     reRender()
@@ -547,10 +670,11 @@ function spawn(source) {
 function reRender() {
     console.log("rerender!!!")
     links.forEach(link => {
-        link.source = nodes.find(node => node.id === link.source.id) || link.source;
-        link.target = nodes.find(node => node.id === link.target.id) || link.target;
+        link.source = nodes.find(node => node.id === getLinkSourceId(link)) || link.source;
+        link.target = nodes.find(node => node.id === getLinkTargetId(link)) || link.target;
     });
     updateMinMaxNodeValue()
+    updateMinMaxLinkValue()
 
     updateSelect()
 
@@ -583,11 +707,21 @@ function reRender() {
 
     simulation.nodes(nodes);
     simulation.force("link").links(links);
-    simulation.alpha(1).restart();
+    if (isLayoutLocked) {
+        nodes.forEach(fixNodePosition)
+        simulation.alphaTarget(0).stop();
+        ticked()
+    } else {
+        nodes.forEach(releaseNodePosition)
+        simulation.alpha(1).restart();
+    }
 
     svg.property("value", {
         nodes: nodes.map(d => ({ id: d.index })),
-        links: links.map(d => ({ source: d.source.index, target: d.target.index }))
+        links: links.map(d => ({
+            source: nodes.findIndex(node => node.id === getLinkSourceId(d)),
+            target: nodes.findIndex(node => node.id === getLinkTargetId(d))
+        }))
     });
 
     svg.dispatch("input");
@@ -729,19 +863,15 @@ impulseAddNodeButton.addEventListener('click', () => {
 
 //SAVE SELECTED NETWORK BUTTON
 networkSaveButton.addEventListener('click', async ()=>{
-    let linksForJson = []
-    links.forEach(element => {
-        linksForJson.push({source: element.source.id, target: element.target.id, value: element.value, label: element.label})
-    })
-    let jsonNetwork = {nodes: nodes, links: linksForJson}
+    if(loggedUser == null) return;
+    let jsonNetwork = serializeGraph()
     let data = {
         name: document.getElementById("networkNameInput").value,
         userId: loggedUser.id,
         networkJson: JSON.stringify(jsonNetwork)
     }
     console.log(data)
-    if(loggedUser == null) return;
-    else{
+    {
         let url = "http://127.0.0.1:8080/api/networks"
         const response = await fetch(url, {
             method: "POST", // *GET, POST, PUT, DELETE, etc.
@@ -783,10 +913,12 @@ openSelectedNetworkButton.addEventListener('click', async () => {
         let json = await response.json()
         console.log(json)
         if(json!=null) network = JSON.parse(json.networkJson);
-        nodes = network.nodes;
-        links = network.links;
-        reRender();
-        console.log(links)
+        if(network!=null) {
+            nodes = network.nodes.map(d => ({ ...d }));
+            links = network.links.map(d => ({ ...d }));
+            reRender();
+            console.log(links)
+        }
     }
 })
 
@@ -802,7 +934,7 @@ submitEditNodeButton.addEventListener('click', () => {
     nodes.forEach(element => {
         if (element.id == tempNodeForEdit.id) {
             element.text = document.getElementById("editNodeNameInput").value
-            element.value = parseInt(document.getElementById("editNodeValueInput").value)
+            element.value = Number(document.getElementById("editNodeValueInput").value)
         }
     });
     reRender()
@@ -873,9 +1005,10 @@ function fillNodeMatrix(){
     }
 
     links.forEach(element=>{
-        let node1 = nodesMap.get(element.source.id)
-        let node2 = nodesMap.get(element.target.id)
+        let node1 = nodesMap.get(getLinkSourceId(element))
+        let node2 = nodesMap.get(getLinkTargetId(element))
 
+        if (!node1 || !node2) return
         nodeMatrix[nodesNumbersMap.get(node1.id)][nodesNumbersMap.get(node2.id)] = element.value
     })
 }
@@ -1204,10 +1337,7 @@ editLinkCloseButton.addEventListener('click', () =>{
 //SAVE BUTTON
 save_button.addEventListener('click', () =>{
     // Создаём объект
-const myObject = {
-    nodes: nodes,
-    links: links
-};
+const myObject = serializeGraph();
 
 // Преобразуем объект в JSON-строку
 const jsonString = JSON.stringify(myObject, null, 2);
@@ -1278,9 +1408,11 @@ fileInput.addEventListener("change", function(event) {
 
 //DELETE LINK BUTTON
 deleteLinkButton.addEventListener('click', async ()=>{
-    console.log(tempLinkForEdit.source.id)
+    const sourceId = getLinkSourceId(tempLinkForEdit)
+    const targetId = getLinkTargetId(tempLinkForEdit)
+    console.log(sourceId)
     console.log(links)
-    links = links.filter(element => (element.source.id !== tempLinkForEdit.source.id)||(element.target.id !== tempLinkForEdit.target.id));
+    links = links.filter(element => (getLinkSourceId(element) !== sourceId)||(getLinkTargetId(element) !== targetId));
     console.log(links)
     editLinkCloseButton.click()
     statusFlag = statusFlagConstants.idle;
@@ -1346,10 +1478,11 @@ if(loggedUser==null) document.getElementById("networkSaveButton").style.display 
 document.getElementById("rangeSlider").addEventListener('input', () => {
     let val = document.getElementById("rangeSlider").value
     console.log(val)
-    nodeRadius = val
+    nodeRadius = Number(val)
     reRender()
 })
 
-
-
-
+document.getElementById("layoutLockCheckbox").addEventListener('change', (event) => {
+    isLayoutLocked = event.target.checked
+    applyLayoutMode()
+})

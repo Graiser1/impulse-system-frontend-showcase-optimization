@@ -65,7 +65,7 @@ export function createMatrixInput(idPrefix, idContainer, rowCount, columnCount, 
     container.appendChild(table);
 }
 
-export function createChart(idContainer, resMatrix, nodeNames) {
+export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber = 1) {
     console.log(nodeNames)
     // Шаг 1: Подготовка контейнера
     let container = document.getElementById(idContainer);
@@ -151,7 +151,9 @@ export function createChart(idContainer, resMatrix, nodeNames) {
         .range([height - margin.bottom, margin.bottom]);
 
     // Шаг 3: Создание осей
-    const xAxis = d3.axisBottom(xScale).ticks(nCols);
+    const xAxis = d3.axisBottom(xScale)
+        .ticks(nCols)
+        .tickFormat(d => firstStepNumber + d);
     const yAxis = d3.axisLeft(yScale).ticks(5);
 
     //Ось X

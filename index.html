@@ -96,8 +96,7 @@
     <div class="impulseEditor" id="impulseEditor">
         <div class="impulseEditor-header">
             <span id="totalImpulseStepsSpan">Количество шагов: </span>
-            <button id="impulseAddStepButton">+</button>
-            <button id="impulseRemoveStepButton">-</button>
+            <input id="impulseStepsInput" type="number" min="0" value="0" title="Количество шагов">
             <button id="impulseSubmitButton">закончить ввод импульсов</button>
             <div id="impulseForNodeContainer">
                 <button id="impulseAddNodeButton">добавить импульс к:</button>
@@ -106,6 +105,12 @@
                 <select style="width: 100%;" id="nodeForImpulseSelect"></select>
             </div>
             <div id="doImpuleStepContainer">
+                <div class="chart-range-control">
+                    <label for="chartStepFromInput">с</label>
+                    <input id="chartStepFromInput" type="number" min="1" value="1" title="Первый шаг на графике">
+                    <label for="chartStepToInput">по</label>
+                    <input id="chartStepToInput" type="number" min="1" value="10" title="Последний шаг на графике">
+                </div>
                 <button id="doImpulseStepButton">выполнить шаг</button>
                 <br>
                 <span id="impulseStepSpan">номер текущего шага: 0</span>
@@ -185,4 +190,3 @@
 
     <script type="module" src="./createScript.js"></script>
 </body>
-

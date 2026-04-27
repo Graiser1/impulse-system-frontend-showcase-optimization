@@ -239,6 +239,27 @@ button:active {
   align-items: center;
 }
 
+#impulseStepsInput{
+  max-width: 64px;
+  text-align: center;
+}
+
+#impulseInputContainer{
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+#impulseInputContainer table{
+  table-layout: fixed;
+  min-width: max-content;
+}
+
+#impulseInputContainer td{
+  min-width: 72px;
+  text-align: center;
+}
+
 #doImpulseStepButton{
   background-color: red;
 }
@@ -258,6 +279,18 @@ button:active {
 
 #doImpuleStepContainer{
   visibility: hidden;
+}
+
+.chart-range-control{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.chart-range-control input{
+  max-width: 52px;
+  text-align: center;
 }
 
 #impulseRemoveStepButton{

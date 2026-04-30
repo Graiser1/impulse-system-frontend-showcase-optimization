@@ -1,6 +1,6 @@
 # Project Audit and Handoff
 
-Last updated: 2026-04-27
+Last updated: 2026-04-30
 
 Repository: `Graiser1/impulse-system-frontend-showcase-optimization`
 
@@ -112,6 +112,8 @@ For npm in PowerShell, prefer `npm.cmd` because `npm.ps1` may be blocked by Exec
 
 - Replaced `+/-` impulse step buttons in UI with a number input for total impulse steps.
 - The number input controls how many impulse columns are created.
+- The impulse step count is applied on change/Enter instead of every keystroke, so typing multi-digit values no longer briefly shrinks and clears the table.
+- Existing impulse input values are preserved when changing the total step count.
 - Impulse matrix container now scrolls horizontally for large step counts.
 - Added separate chart display range controls:
 - `с` - first displayed step.
@@ -119,35 +121,36 @@ For npm in PowerShell, prefer `npm.cmd` because `npm.ps1` may be blocked by Exec
 - Total calculated/input steps and displayed chart range are separate.
 - Example: calculate/input 50 steps, show only steps 10 through 20.
 - The chart X axis now uses real step numbers for the selected display slice.
+- When step execution moves beyond the current displayed `to` step, the chart range expands automatically so the newly calculated step is visible.
+- Added a collapsible vertex filter for the impulse chart. It starts collapsed and lets users choose which vertices are rendered.
+- Added an impulse chart legend under the chart. It uses the same dedicated high-contrast colors as the chart lines and points.
+- Impulse chart colors are independent from the graph/node colors and remain stable for a given vertex even when other vertices are hidden.
 
 ## Current Git State
 
 Important recent commits:
 
+- `5fd771f Add project audit handoff`
 - `493eeca Improve editing and impulse chart controls`
 - `8914e20 Add GitHub Pages deployment`
 - `df605dd Improve graph layout and visuals`
 - `038e8dd Initial commit`
 
-At the time of this audit, functional changes through `493eeca` were pushed to `origin/main`. This audit file and `.gitignore` update should be committed separately after creation.
+At the time of this audit update, the current impulse editor/chart changes are ready to commit and push to `origin/main`.
 
 ## Known Issues and Technical Debt
 
 - `createScript.js` is very large and contains most app logic. Future work should gradually extract helpers rather than adding more globals.
-- Some comments and default data still contain mojibake/broken Russian encoding, especially in `data2.json` and older comments.
 - There are many `console.log` calls left from debugging.
 - Backend integration points still point to `http://127.0.0.1:8080` for login/register/network save/load. GitHub Pages users will not have that backend unless it is deployed separately.
 - Login/register buttons are hidden in the current UI.
 - `graphic.html` appears to be an old/unused separate page.
 - The impulse calculation logic is fragile and should be tested with known matrices before serious use.
-- The impulse table currently rebuilds when step count changes, so already typed impulse values can be lost if the user changes the total step count after entering data.
 - Some old code paths remain in comments and legacy functions. Clean only after confirming behavior.
 
 ## Recommended Next Steps
 
-- Preserve entered impulse values when changing the total step count.
 - Add an explicit "run all steps" button so users do not need to click `выполнить шаг` repeatedly.
-- Clean up text encoding in UI strings and default datasets.
 - Remove or hide unused backend/auth UI unless a backend is part of the assignment.
 - Add lightweight manual test scenarios in `README.md`.
 - Consider extracting graph serialization, layout, impulse matrix math, and chart slicing into separate modules.

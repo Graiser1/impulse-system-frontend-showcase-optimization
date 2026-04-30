@@ -838,21 +838,7 @@ impulseSubmitButton.addEventListener('click', () => {
 
 //IMPULSE STEPS ADD BUTTON
 if (document.getElementById("impulseAddStepButton")) document.getElementById("impulseAddStepButton").addEventListener('click', () => {
-    impulseSteps++
-    document.getElementById("impulseStepsInput").value = impulseSteps
-    let rowHeaders = []
-    let columnHeaders = []
-    nodes.forEach(element=>{
-        rowHeaders.push(element.text)
-    })
-    for (let i = 0;i<impulseSteps;i++){
-        columnHeaders.push(i+1)
-    }
-    document.getElementById("totalImpulseStepsSpan").innerHTML = "Количество шагов: "+impulseSteps;
-    createMatrixInput("impulse", "impulseInputContainer", nodes.length, impulseSteps, rowHeaders, columnHeaders)
-    document.getElementById("impulseRemoveStepButton").style.visibility = "visible"
-    document.getElementById("impulseForNodeContainer").style.visibility = "visible"
-    document.getElementById("impulseSubmitButton").style.visibility = "visible"
+    setImpulseSteps(impulseSteps + 1)
 });
 
 var selectedImpulseNodesIds = []
@@ -871,7 +857,30 @@ function showSelectedImpulseRows() {
     })
 }
 
+function getImpulseInputValues(rowCount, columnCount) {
+    const values = []
+    for (let i = 0; i < rowCount; i++) {
+        values[i] = []
+        for (let j = 0; j < columnCount; j++) {
+            const input = document.getElementById("impulseInput:"+i+"-"+j)
+            values[i][j] = input ? input.value : ""
+        }
+    }
+    return values
+}
+
+function restoreImpulseInputValues(values) {
+    for (let i = 0; i < values.length; i++) {
+        for (let j = 0; j < values[i].length; j++) {
+            const input = document.getElementById("impulseInput:"+i+"-"+j)
+            if (input) input.value = values[i][j]
+        }
+    }
+}
+
 function setImpulseSteps(nextSteps) {
+    const previousValues = getImpulseInputValues(nodes.length, impulseSteps)
+
     impulseSteps = Math.max(0, Number.parseInt(nextSteps) || 0)
     document.getElementById("impulseStepsInput").value = impulseSteps
     document.getElementById("totalImpulseStepsSpan").innerHTML = "Количество шагов: "+impulseSteps;
@@ -891,38 +900,14 @@ function setImpulseSteps(nextSteps) {
         columnHeaders.push(i+1)
     }
     createMatrixInput("impulse", "impulseInputContainer", nodes.length, impulseSteps, rowHeaders, columnHeaders)
+    restoreImpulseInputValues(previousValues)
     showSelectedImpulseRows()
     updateImpulseControlsVisibility()
 }
 
 //IMPULSE STEPS REMOVE BUTTON
 if (document.getElementById("impulseRemoveStepButton")) document.getElementById("impulseRemoveStepButton").addEventListener('click', () => {
-    if(impulseSteps!=0){
-        impulseSteps--
-        document.getElementById("impulseStepsInput").value = impulseSteps
-        if (impulseSteps==0) {
-            document.getElementById("impulseInputContainer").innerHTML = ""
-            if (document.getElementById("impulseRemoveStepButton")) document.getElementById("impulseRemoveStepButton").style.visibility = "hidden"
-            document.getElementById("impulseForNodeContainer").style.visibility = "hidden"
-            document.getElementById("impulseSubmitButton").style.visibility = "hidden"
-            document.getElementById("totalImpulseStepsSpan").innerHTML = "Количество шагов: "+impulseSteps;
-            return
-        }
-        let rowHeaders = []
-        let columnHeaders = []
-        nodes.forEach(element=>{
-            rowHeaders.push(element.text)
-        })
-        for (let i = 0;i<impulseSteps;i++){
-            columnHeaders.push(i+1)
-        }
-        createMatrixInput("impulse", "impulseInputContainer", nodes.length, impulseSteps, rowHeaders, columnHeaders)}
-    //show selected node rows
-    selectedImpulseNodesIds.forEach(element => {
-        console.log("impulseRow:"+element)
-        document.getElementById("impulseRow:"+element).style.display = "flex"
-    })
-    document.getElementById("totalImpulseStepsSpan").innerHTML = "Количество шагов: "+impulseSteps;
+    if(impulseSteps!=0) setImpulseSteps(impulseSteps - 1)
 });
 
 document.getElementById("impulseStepsInput").addEventListener('change', (event) => {
@@ -933,10 +918,6 @@ document.getElementById("impulseStepsInput").addEventListener('keydown', (event)
     if (event.key === "Enter") {
         event.currentTarget.blur()
     }
-})
-
-document.getElementById("impulseStepsInput").addEventListener('input', (event) => {
-    setImpulseSteps(event.target.value)
 })
 
 function updateChartRangeFromInput(event) {
@@ -1127,6 +1108,9 @@ updateSelect()
 
 var currImpulseStep = 0;
 var resValues = [];
+var selectedChartNodeIds = new Set();
+var chartNodeFilterInitialized = false;
+var isChartNodeFilterOpen = false;
 
 function getNodeNamesForChart() {
     let nodeNames = [];
@@ -1134,6 +1118,79 @@ function getNodeNamesForChart() {
         nodeNames.push(nodesNumberNodeMap.get(i).text)
     }
     return nodeNames
+}
+
+function ensureChartNodeFilterContainer() {
+    let container = document.getElementById("chartNodeFilterContainer")
+    if (container) return container
+
+    container = document.createElement("div")
+    container.id = "chartNodeFilterContainer"
+    document.getElementById("doImpuleStepContainer").appendChild(container)
+    return container
+}
+
+function initializeChartNodeFilter() {
+    if (chartNodeFilterInitialized) return
+
+    selectedChartNodeIds.clear()
+    nodes.forEach(node => selectedChartNodeIds.add(node.id))
+    chartNodeFilterInitialized = true
+}
+
+function getSelectedChartNodeIndexes() {
+    initializeChartNodeFilter()
+
+    const selectedIndexes = []
+    for (let i=0;i<nodes.length;i++){
+        const node = nodesNumberNodeMap.get(i)
+        if (node && selectedChartNodeIds.has(node.id)) selectedIndexes.push(i)
+    }
+    return selectedIndexes
+}
+
+function renderChartNodeFilter() {
+    initializeChartNodeFilter()
+
+    const container = ensureChartNodeFilterContainer()
+    container.innerHTML = ""
+
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "chart-node-filter-toggle"
+    button.textContent = isChartNodeFilterOpen ? "Скрыть вершины графика" : "Выбрать вершины графика"
+    button.addEventListener("click", () => {
+        isChartNodeFilterOpen = !isChartNodeFilterOpen
+        renderChartNodeFilter()
+    })
+    container.appendChild(button)
+
+    if (!isChartNodeFilterOpen) return
+
+    const list = document.createElement("div")
+    list.className = "chart-node-filter-list"
+    container.appendChild(list)
+
+    nodes.forEach(node => {
+        const label = document.createElement("label")
+        label.className = "chart-node-filter-item"
+
+        const checkbox = document.createElement("input")
+        checkbox.type = "checkbox"
+        checkbox.checked = selectedChartNodeIds.has(node.id)
+        checkbox.addEventListener("change", () => {
+            if (checkbox.checked) selectedChartNodeIds.add(node.id)
+            else selectedChartNodeIds.delete(node.id)
+            renderImpulseChart()
+        })
+
+        const text = document.createElement("span")
+        text.textContent = node.text
+
+        label.appendChild(checkbox)
+        label.appendChild(text)
+        list.appendChild(label)
+    })
 }
 
 function getChartStepRange() {
@@ -1160,9 +1217,30 @@ function renderImpulseChart() {
         return
     }
 
-    const chartMatrix = resValues.map(row => row.slice(from - 1, to))
+    const selectedIndexes = getSelectedChartNodeIndexes()
+    const nodeNames = getNodeNamesForChart()
+    const chartMatrix = selectedIndexes.map(index => resValues[index].slice(from - 1, to))
+    const chartNodeNames = selectedIndexes.map(index => nodeNames[index])
+
+    if (!chartMatrix.length) {
+        document.getElementById("impulseChartContainer").innerHTML = ""
+        return
+    }
+
     document.getElementById("impulseChartContainer").style.display = "flex"
-    createChart("impulseChartContainer", chartMatrix, getNodeNamesForChart(), from)
+    createChart("impulseChartContainer", chartMatrix, chartNodeNames, from, selectedIndexes)
+}
+
+function keepCurrentImpulseStepVisible() {
+    if (currImpulseStep < 1) return
+
+    const fromInput = document.getElementById("chartStepFromInput")
+    const toInput = document.getElementById("chartStepToInput")
+    const fromStep = Number.parseInt(fromInput.value) || 1
+    const toStep = Number.parseInt(toInput.value) || fromStep
+
+    if (currImpulseStep < fromStep) fromInput.value = currImpulseStep
+    if (currImpulseStep > toStep) toInput.value = currImpulseStep
 }
 
 function doImpulseStep(){
@@ -1341,6 +1419,7 @@ doImpulseStepButton.addEventListener('click', () => {
         element.className+= " activeColumn"
     });
     document.getElementById("impulseStepSpan").innerHTML = "номер текущего шага: " + currImpulseStep
+    keepCurrentImpulseStepVisible()
     renderImpulseChart()
 });
 //SUBMIT EDIT NETWORK BUTTON
@@ -1374,6 +1453,9 @@ returnEditNetworkButton.addEventListener('click', ()=>{
     currImpulseStep = 0;
     document.getElementById("chartStepFromInput").value = 1
     document.getElementById("chartStepToInput").value = 10
+    const chartNodeFilterContainer = document.getElementById("chartNodeFilterContainer")
+    if (chartNodeFilterContainer) chartNodeFilterContainer.innerHTML = ""
+    isChartNodeFilterOpen = false
 })
 
 //LOGIN BUTTON
@@ -1606,6 +1688,10 @@ function resetImpulseEditing(){
     document.getElementById("impulseStepSpan").innerHTML = ""
     document.getElementById("chartStepFromInput").value = 1
     document.getElementById("chartStepToInput").value = 10
+    selectedChartNodeIds.clear()
+    chartNodeFilterInitialized = false
+    isChartNodeFilterOpen = false
+    renderChartNodeFilter()
 }
 
 if(loggedUser==null) document.getElementById("networkSelect").style.display = "none";

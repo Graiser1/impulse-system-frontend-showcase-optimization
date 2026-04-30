@@ -65,14 +65,29 @@ export function createMatrixInput(idPrefix, idContainer, rowCount, columnCount, 
     container.appendChild(table);
 }
 
-export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber = 1) {
+const impulseChartColors = [
+    "#2563eb",
+    "#7c3aed",
+    "#0891b2",
+    "#db2777",
+    "#4f46e5",
+    "#0e7490",
+    "#9333ea",
+    "#0284c7",
+    "#be185d",
+    "#4338ca",
+    "#0369a1",
+    "#86198f"
+];
+
+function getImpulseChartColor(index) {
+    return impulseChartColors[index % impulseChartColors.length];
+}
+
+export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber = 1, colorIndexes = null) {
     console.log(nodeNames)
     // Шаг 1: Подготовка контейнера
     let container = document.getElementById(idContainer);
-
-    const color = d3.scaleSequential(d3.interpolateRdYlGn);
-
-    //color((d.value-minNodeValue)/(maxNodeValue-minNodeValue+1)))
 
     let minNodeValue = null;
     let maxNodeValue = null;
@@ -193,17 +208,18 @@ export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber =
         .x((d, i) => xScale(i))
         .y(d => yScale(d));
 
+    const lineColors = [];
+
     resMatrix.forEach((row, rowIndex) => {
         console.log(`Row ${rowIndex} data: ${row}`);
+        const lineColor = getImpulseChartColor(colorIndexes?.[rowIndex] ?? rowIndex)
+        lineColors[rowIndex] = lineColor
 
         // Добавление линии
         svg.append("path")
             .datum(row)
             .attr("fill", "none")
-            .attr("stroke", d => {
-                console.log(d)
-                return color((d[d.length-1]-minNodeValue)/(maxNodeValue-minNodeValue+1))
-            })
+            .attr("stroke", lineColor)
             .attr("stroke-width", 1.5)
             .attr("d", line);
 
@@ -216,7 +232,7 @@ export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber =
             .attr("cx", (d, i) => xScale(i))
             .attr("cy", d => yScale(d))
             .attr("r", 3)
-            .attr("fill", "red")
+            .attr("fill", lineColor)
             .attr("title", nodeNames[rowIndex])
 
         /*
@@ -232,6 +248,24 @@ export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber =
 
     // Добавление созданного SVG в контейнер
     container.appendChild(svg.node());
+
+    const legend = document.createElement("div");
+    legend.className = "impulse-chart-legend";
+    nodeNames.forEach((nodeName, index) => {
+        const item = document.createElement("span");
+        item.className = "impulse-chart-legend-item";
+        const swatch = document.createElement("span");
+        swatch.className = "impulse-chart-legend-swatch";
+        swatch.style.backgroundColor = lineColors[index];
+        const text = document.createElement("span");
+        text.className = "impulse-chart-legend-text";
+        text.style.color = lineColors[index];
+        text.textContent = nodeName;
+        item.appendChild(swatch);
+        item.appendChild(text);
+        legend.appendChild(item);
+    });
+    container.appendChild(legend);
 }
 
 

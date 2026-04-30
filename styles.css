@@ -15,9 +15,12 @@
   border: #1f77b4  10px solid;
   background-color: #ddd;
   display: none;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   position: absolute;
   top: 12%; left: 62%;
+  overflow: auto;
 }
 
 .impulseEditor{
@@ -291,6 +294,76 @@ button:active {
 .chart-range-control input{
   max-width: 52px;
   text-align: center;
+}
+
+#chartNodeFilterContainer{
+  margin-top: 6px;
+  padding: 0;
+}
+
+.chart-node-filter-toggle{
+  width: 100%;
+  font-size: 9px;
+  padding: 4px 6px;
+  background-color: #546e7a;
+}
+
+.chart-node-filter-list{
+  max-height: 92px;
+  overflow-y: auto;
+  margin-top: 4px;
+  padding: 4px;
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 1px solid #bbb;
+}
+
+.chart-node-filter-item{
+  color: #111;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  text-align: left;
+  margin: 2px 0;
+  text-transform: none;
+}
+
+.chart-node-filter-item input{
+  width: auto;
+}
+
+.impulse-chart-legend{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 12px;
+  padding: 0 10px 8px;
+  width: 92%;
+  align-self: flex-start;
+  margin-left: 12px;
+}
+
+.impulse-chart-legend-item{
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(255,255,255,0.85);
+}
+
+.impulse-chart-legend-swatch{
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.impulse-chart-legend-text{
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #impulseRemoveStepButton{

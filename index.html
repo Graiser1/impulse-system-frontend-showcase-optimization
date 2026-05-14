@@ -13,10 +13,11 @@
 <header>
     <div id="top-menu">
         <div id="statusContainer">
-            <span style="background-color: red;">status: </span>
-            <span id="status" style="background-color: red;">status</span>
+            <span class="status-label">Режим</span>
+            <span id="status" class="status-value">status</span>
         </div>
         <button id="returnEditNetworkButton">вернуться к редактированию графа</button>
+        <button id="controlProgramButton">поиск программы управления</button>
         <div id="network-edit-menu">
             <button id="addNewNodeButton">
                 Добавить вершину
@@ -118,6 +119,30 @@
         </div>
         <div id="impulseInputContainer"></div>
     </div>
+</div>
+
+<div class="form-popup control-program-popup" id="controlProgramForm">
+    <form action="/action_page.php" class="form-container control-program-container">
+        <h1>Поиск программы управления</h1>
+
+        <div class="control-program-row">
+            <label for="targetDynamicStepsInput"><b>Шаги динамики цели</b></label>
+            <input id="targetDynamicStepsInput" type="number" min="1" value="10">
+        </div>
+
+        <label><b>Целевые вершины</b></label>
+        <div id="controlTargetList" class="control-program-list"></div>
+
+        <label><b>Ресурсные вершины и шаги управления</b></label>
+        <div id="controlResourceList" class="control-program-list"></div>
+
+        <span id="controlProgramStatus" class="control-program-status"></span>
+
+        <div class="control-program-actions">
+            <button id="applyControlProgramButton" type="button" class="btn">Подставить</button>
+            <button id="controlProgramCloseButton" type="button" class="btn cancel">Закрыть</button>
+        </div>
+    </form>
 </div>
 
 <!-- The form -->

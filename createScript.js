@@ -930,6 +930,10 @@ document.getElementById("chartStepToInput").addEventListener('change', renderImp
 document.getElementById("chartStepFromInput").addEventListener('keydown', updateChartRangeFromInput)
 document.getElementById("chartStepToInput").addEventListener('keydown', updateChartRangeFromInput)
 
+controlProgramButton.addEventListener('click', openControlProgramForm)
+controlProgramCloseButton.addEventListener('click', closeControlProgramForm)
+applyControlProgramButton.addEventListener('click', applyControlProgram)
+
 //ADD IMPULSE FOR NODE BUTTON
 impulseAddNodeButton.addEventListener('click', () => {
     let rowId = "impulseRow:";
@@ -1120,6 +1124,256 @@ function getNodeNamesForChart() {
     return nodeNames
 }
 
+function getNodeChartRole(node) {
+    const targetNames = new Set([
+        "Уровень загрязнения",
+        "Качество жизни",
+        "Отравляющие вещества",
+        "ЧС",
+        "РЈСЂРѕРІРµРЅСЊ Р·Р°РіСЂСЏР·РЅРµРЅРёСЏ",
+        "РљР°С‡РµСЃС‚РІРѕ Р¶РёР·РЅРё",
+        "РћС‚СЂР°РІР»СЏСЋС‰РёРµ РІРµС‰РµСЃС‚РІР°",
+        "Р§РЎ"
+    ])
+
+    const resourceNames = new Set([
+        "Цена квоты",
+        "Доп. Эмиссия",
+        "Кол-во авто",
+        "Р¦РµРЅР° РєРІРѕС‚С‹",
+        "Р”РѕРї. Р­РјРёСЃСЃРёСЏ",
+        "РљРѕР»-РІРѕ Р°РІС‚Рѕ"
+    ])
+
+    if (targetNames.has(node?.text)) return "target"
+    if (resourceNames.has(node?.text)) return "resource"
+    return "other"
+}
+
+function getNodeChartRoles() {
+    const roles = []
+    for (let i=0;i<nodes.length;i++){
+        roles.push(getNodeChartRole(nodesNumberNodeMap.get(i)))
+    }
+    return roles
+}
+
+function getRoleName(role) {
+    if (role === "target") return "цель"
+    if (role === "resource") return "ресурс"
+    return "прочее"
+}
+
+function getDefaultTargetDirection(node) {
+    const positiveTargetNames = new Set([
+        "Качество жизни",
+        "РљР°С‡РµСЃС‚РІРѕ Р¶РёР·РЅРё"
+    ])
+
+    if (positiveTargetNames.has(node?.text)) return 1
+    if (getNodeChartRole(node) === "target") return -1
+    return 1
+}
+
+function parseControlSteps(rawValue, fallbackSteps) {
+    const fallback = Array.from({ length: fallbackSteps }, (_, index) => index + 1)
+    if (!rawValue || !rawValue.trim()) return fallback
+
+    const steps = new Set()
+    rawValue
+        .split(/[,\s;]+/)
+        .map(part => part.trim())
+        .filter(Boolean)
+        .forEach(part => {
+            const rangeMatch = part.match(/^(\d+)-(\d+)$/)
+            if (rangeMatch) {
+                const start = Number.parseInt(rangeMatch[1])
+                const end = Number.parseInt(rangeMatch[2])
+                const from = Math.min(start, end)
+                const to = Math.max(start, end)
+                for (let step = from; step <= to; step++) steps.add(step)
+                return
+            }
+
+            const step = Number.parseInt(part)
+            if (step > 0) steps.add(step)
+        })
+
+    return [...steps].sort((a, b) => a - b)
+}
+
+function renderControlProgramForm() {
+    fillNodeAndLinkMaps()
+
+    const targetList = document.getElementById("controlTargetList")
+    const resourceList = document.getElementById("controlResourceList")
+    targetList.innerHTML = ""
+    resourceList.innerHTML = ""
+
+    const defaultSteps = Math.max(impulseSteps || 10, 1)
+    document.getElementById("targetDynamicStepsInput").value = defaultSteps
+
+    nodes.forEach((node, index) => {
+        const role = getNodeChartRole(node)
+        const defaultDirection = getDefaultTargetDirection(node)
+
+        const targetItem = document.createElement("label")
+        targetItem.className = "control-program-item"
+        targetItem.innerHTML = `
+            <input class="control-target-checkbox" type="checkbox" data-node-index="${index}" ${role === "target" ? "checked" : ""}>
+            <span class="control-program-item-name" title="${node.text}">${node.text}</span>
+            <select class="control-target-direction" data-node-index="${index}">
+                <option value="1" ${defaultDirection === 1 ? "selected" : ""}>рост</option>
+                <option value="-1" ${defaultDirection === -1 ? "selected" : ""}>снижение</option>
+            </select>
+            <span class="chart-node-role-badge chart-node-role-${role}">${getRoleName(role)}</span>
+        `
+        targetList.appendChild(targetItem)
+
+        const resourceItem = document.createElement("label")
+        resourceItem.className = "control-program-item"
+        resourceItem.innerHTML = `
+            <input class="control-resource-checkbox" type="checkbox" data-node-index="${index}" ${role === "resource" ? "checked" : ""}>
+            <span class="control-program-item-name" title="${node.text}">${node.text}</span>
+            <input class="control-resource-steps" type="text" data-node-index="${index}" value="1-${defaultSteps}" title="Например: 1-5 или 1, 3, 5">
+            <span class="chart-node-role-badge chart-node-role-${role}">${getRoleName(role)}</span>
+        `
+        resourceList.appendChild(resourceItem)
+    })
+
+    targetList.querySelectorAll(".control-program-item").forEach(item => {
+        if (!item.querySelector(".chart-node-role-target")) item.remove()
+        else item.classList.add("control-program-target-item")
+    })
+    resourceList.querySelectorAll(".control-program-item").forEach(item => {
+        if (!item.querySelector(".chart-node-role-resource")) item.remove()
+        else item.classList.add("control-program-resource-item")
+    })
+    resourceList.querySelectorAll(".control-program-item").forEach(item => {
+        const index = item.querySelector(".control-resource-checkbox")?.dataset.nodeIndex
+        if (!index) return
+        const roleBadge = item.querySelector(".chart-node-role-badge")
+        if (roleBadge) roleBadge.remove()
+        const strengthInput = document.createElement("input")
+        strengthInput.className = "control-resource-strength"
+        strengthInput.type = "number"
+        strengthInput.dataset.nodeIndex = index
+        strengthInput.value = "1"
+        strengthInput.step = "1"
+        strengthInput.title = "Коэффициент импульса"
+        item.appendChild(strengthInput)
+    })
+
+    if (!targetList.children.length) {
+        targetList.textContent = "Целевые вершины не найдены."
+    }
+    if (!resourceList.children.length) {
+        resourceList.textContent = "Ресурсные вершины не найдены."
+    }
+
+    document.getElementById("controlProgramStatus").textContent = "Выберите цели, ресурсы и шаги управления."
+}
+
+function openControlProgramForm() {
+    renderControlProgramForm()
+    document.getElementById("controlProgramForm").style.display = "block"
+    document.getElementById("main").style.opacity = 0.45
+}
+
+function closeControlProgramForm() {
+    document.getElementById("controlProgramForm").style.display = "none"
+    document.getElementById("main").style.opacity = 1
+}
+
+function getControlProgramSelections() {
+    const targetSteps = Math.max(1, Number.parseInt(document.getElementById("targetDynamicStepsInput").value) || 1)
+    const targets = [...document.querySelectorAll(".control-target-checkbox")]
+        .filter(input => input.checked)
+        .map(input => {
+            const index = Number.parseInt(input.dataset.nodeIndex)
+            const direction = Number(document.querySelector(`.control-target-direction[data-node-index="${index}"]`).value)
+            return { index, direction }
+        })
+
+    const resources = [...document.querySelectorAll(".control-resource-checkbox")]
+        .filter(input => input.checked)
+        .map(input => {
+            const index = Number.parseInt(input.dataset.nodeIndex)
+            const rawSteps = document.querySelector(`.control-resource-steps[data-node-index="${index}"]`).value
+            const strength = Number(document.querySelector(`.control-resource-strength[data-node-index="${index}"]`)?.value)
+            return {
+                index,
+                steps: parseControlSteps(rawSteps, targetSteps),
+                strength: Number.isFinite(strength) ? strength : 1
+            }
+        })
+        .filter(resource => resource.steps.length)
+
+    return { targetSteps, targets, resources }
+}
+
+function clearImpulseInputs() {
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = 0; j < impulseSteps; j++) {
+            const input = document.getElementById("impulseInput:"+i+"-"+j)
+            if (input) input.value = 0
+        }
+    }
+}
+
+function applyControlProgram() {
+    const { targetSteps, targets, resources } = getControlProgramSelections()
+
+    if (!targets.length) {
+        document.getElementById("controlProgramStatus").textContent = "Нужно выбрать хотя бы одну целевую вершину."
+        return
+    }
+
+    if (!resources.length) {
+        document.getElementById("controlProgramStatus").textContent = "Нужно выбрать хотя бы одну ресурсную вершину."
+        return
+    }
+
+    const maxControlStep = Math.max(...resources.flatMap(resource => resource.steps))
+    const totalSteps = Math.max(targetSteps, maxControlStep)
+    setImpulseSteps(totalSteps)
+    clearImpulseInputs()
+    currImpulseStep = 0
+    resValues = []
+    document.getElementById("impulseStepSpan").innerHTML = ""
+    document.getElementById("impulseChartContainer").style.display = "none"
+
+    fillNodeMatrix()
+    const influenceMatrix = transpose(nodeMatrix)
+
+    selectedImpulseNodesIds = [...new Set(resources.map(resource => resource.index))]
+    showSelectedImpulseRows()
+
+    resources.forEach(resource => {
+        resource.steps.forEach(step => {
+            const columnIndex = step - 1
+            if (columnIndex < 0 || columnIndex >= impulseSteps) return
+
+            let score = 0
+            targets.forEach(target => {
+                const power = targetSteps - step
+                if (power < 0) return
+                const influence = matrixPower(influenceMatrix, power)[target.index][resource.index]
+                score += target.direction * Number(influence)
+            })
+
+            const input = document.getElementById("impulseInput:"+resource.index+"-"+columnIndex)
+            if (input) input.value = score > 0 ? resource.strength : score < 0 ? -resource.strength : 0
+        })
+    })
+
+    document.getElementById("chartStepFromInput").value = 1
+    document.getElementById("chartStepToInput").value = targetSteps
+    updateImpulseControlsVisibility()
+    document.getElementById("controlProgramStatus").textContent =
+        `Подставлено: ресурсов ${resources.length}, шагов управления ${maxControlStep}, шагов графика ${targetSteps}.`
+}
+
 function ensureChartNodeFilterContainer() {
     let container = document.getElementById("chartNodeFilterContainer")
     if (container) return container
@@ -1187,8 +1441,13 @@ function renderChartNodeFilter() {
         const text = document.createElement("span")
         text.textContent = node.text
 
+        const role = document.createElement("span")
+        role.className = `chart-node-role-badge chart-node-role-${getNodeChartRole(node)}`
+        role.textContent = getNodeChartRole(node) === "target" ? "цель" : getNodeChartRole(node) === "resource" ? "ресурс" : "прочее"
+
         label.appendChild(checkbox)
         label.appendChild(text)
+        label.appendChild(role)
         list.appendChild(label)
     })
 }
@@ -1219,8 +1478,10 @@ function renderImpulseChart() {
 
     const selectedIndexes = getSelectedChartNodeIndexes()
     const nodeNames = getNodeNamesForChart()
+    const nodeRoles = getNodeChartRoles()
     const chartMatrix = selectedIndexes.map(index => resValues[index].slice(from - 1, to))
     const chartNodeNames = selectedIndexes.map(index => nodeNames[index])
+    const chartNodeRoles = selectedIndexes.map(index => nodeRoles[index])
 
     if (!chartMatrix.length) {
         document.getElementById("impulseChartContainer").innerHTML = ""
@@ -1228,7 +1489,8 @@ function renderImpulseChart() {
     }
 
     document.getElementById("impulseChartContainer").style.display = "flex"
-    createChart("impulseChartContainer", chartMatrix, chartNodeNames, from, selectedIndexes)
+    createChart("impulseChartContainer", chartMatrix, chartNodeNames, from, selectedIndexes, chartNodeRoles)
+    installResizablePanels()
 }
 
 function keepCurrentImpulseStepVisible() {
@@ -1429,8 +1691,10 @@ submitBuiltNetworkButton.addEventListener('click', ()=>{
     document.getElementById("impulseEditor").style.display = "block"
 
     document.getElementById("network-edit-menu").style.visibility = "hidden"
+    document.getElementById("userTopMenu").style.display = "none"
     document.getElementById("impulseEditor").style.visibility = "visible"
     document.getElementById("returnEditNetworkButton").style.display = "block"
+    document.getElementById("controlProgramButton").style.display = "block"
     document.getElementById("totalImpulseStepsSpan").innerHTML = "Количество шагов: "+impulseSteps;
     document.getElementById("impulseStepsInput").value = impulseSteps
     document.getElementById("container").style.width = "60%"
@@ -1445,8 +1709,10 @@ returnEditNetworkButton.addEventListener('click', ()=>{
     document.getElementById("impulseEditor").style.display = "none"
     document.getElementById("impulseChartContainer").style.display = "none"
     document.getElementById("network-edit-menu").style.visibility = "visible"
+    document.getElementById("userTopMenu").style.display = "flex"
     document.getElementById("impulseEditor").style.visibility = "hidden"
     document.getElementById("returnEditNetworkButton").style.display = "block"
+    document.getElementById("controlProgramButton").style.display = "none"
     document.getElementById("container").style.width = "96%"
     impulseSteps = 0;
     document.getElementById("impulseStepsInput").value = impulseSteps
@@ -1456,6 +1722,7 @@ returnEditNetworkButton.addEventListener('click', ()=>{
     const chartNodeFilterContainer = document.getElementById("chartNodeFilterContainer")
     if (chartNodeFilterContainer) chartNodeFilterContainer.innerHTML = ""
     isChartNodeFilterOpen = false
+    closeControlProgramForm()
 })
 
 //LOGIN BUTTON
@@ -1697,6 +1964,7 @@ function resetImpulseEditing(){
 if(loggedUser==null) document.getElementById("networkSelect").style.display = "none";
 if(loggedUser==null) document.getElementById("networkNameInputContainer").style.display = "none";
 if(loggedUser==null) document.getElementById("returnEditNetworkButton").style.display = "none";
+document.getElementById("controlProgramButton").style.display = "none";
 if(loggedUser==null) document.getElementById("openSelectedNetworkButton").style.display = "none";
 if(loggedUser==null) document.getElementById("networkSaveButton").style.display = "none";
 
@@ -1711,3 +1979,182 @@ document.getElementById("layoutLockCheckbox").addEventListener('change', (event)
     isLayoutLocked = event.target.checked
     applyLayoutMode()
 })
+
+const panelLayoutGap = 12
+const panelViewportPadding = 12
+
+function getPanelMinSize(panel, propertyName, fallback) {
+    return Number.parseFloat(getComputedStyle(panel)[propertyName]) || fallback
+}
+
+function isPanelVisible(panel) {
+    return panel && getComputedStyle(panel).display !== "none"
+}
+
+function getRightColumnPanels() {
+    return [
+        document.getElementById("impulseChartContainer"),
+        document.getElementById("impulseEditor")
+    ].filter(Boolean)
+}
+
+function isImpulseLayoutVisible() {
+    return getRightColumnPanels().some(isPanelVisible)
+}
+
+function getRightColumnMinWidth() {
+    return Math.max(...getRightColumnPanels().map(panel => getPanelMinSize(panel, "minWidth", 260)), 260)
+}
+
+function setRightColumn(left, width) {
+    getRightColumnPanels().forEach(panel => {
+        panel.style.left = `${Math.round(left)}px`
+        panel.style.width = `${Math.round(width)}px`
+    })
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value))
+}
+
+function applyHorizontalPanelLayout(activePanel, directions, startRect, dx) {
+    const graphPanel = document.getElementById("container")
+    if (!graphPanel) return null
+
+    const graphRect = graphPanel.getBoundingClientRect()
+    const graphMinWidth = getPanelMinSize(graphPanel, "minWidth", 280)
+    const rightMinWidth = getRightColumnMinWidth()
+    const viewportRight = window.innerWidth - panelViewportPadding
+    const impulseVisible = isImpulseLayoutVisible()
+
+    let nextLeft = startRect.left
+    let nextWidth = startRect.width
+
+    if (directions.includes("right")) {
+        const maxWidth = impulseVisible
+            ? viewportRight - graphRect.left - panelLayoutGap - rightMinWidth
+            : viewportRight - graphRect.left
+        nextWidth = clamp(startRect.width + dx, graphMinWidth, maxWidth)
+
+        if (activePanel === graphPanel && impulseVisible) {
+            const rightLeft = graphRect.left + nextWidth + panelLayoutGap
+            const rightWidth = viewportRight - rightLeft
+            setRightColumn(rightLeft, Math.max(rightMinWidth, rightWidth))
+        }
+    }
+
+    if (directions.includes("left")) {
+        const rightEdge = viewportRight
+        const minLeft = graphRect.left + graphMinWidth + panelLayoutGap
+        const maxLeft = rightEdge - rightMinWidth
+        nextLeft = clamp(startRect.left + dx, minLeft, maxLeft)
+        nextWidth = rightEdge - nextLeft
+
+        const nextGraphWidth = Math.max(graphMinWidth, nextLeft - graphRect.left - panelLayoutGap)
+        graphPanel.style.width = `${Math.round(nextGraphWidth)}px`
+        setRightColumn(nextLeft, nextWidth)
+    }
+
+    return { width: nextWidth, left: nextLeft }
+}
+
+function applyVerticalPanelLayout(activePanel, startRect, dy) {
+    const chartPanel = document.getElementById("impulseChartContainer")
+    const editorPanel = document.getElementById("impulseEditor")
+    const minHeight = getPanelMinSize(activePanel, "minHeight", 160)
+    const viewportBottom = window.innerHeight - panelViewportPadding
+
+    if (activePanel === chartPanel && isPanelVisible(editorPanel)) {
+        const editorRect = editorPanel.getBoundingClientRect()
+        const editorMinHeight = getPanelMinSize(editorPanel, "minHeight", 160)
+        const sharedBottom = Math.min(viewportBottom, editorRect.bottom)
+        const maxChartHeight = sharedBottom - startRect.top - panelLayoutGap - editorMinHeight
+        const nextChartHeight = clamp(startRect.height + dy, minHeight, maxChartHeight)
+        const nextEditorTop = startRect.top + nextChartHeight + panelLayoutGap
+        const nextEditorHeight = sharedBottom - nextEditorTop
+
+        chartPanel.style.height = `${Math.round(nextChartHeight)}px`
+        editorPanel.style.top = `${Math.round(nextEditorTop)}px`
+        editorPanel.style.height = `${Math.round(nextEditorHeight)}px`
+
+        return nextChartHeight
+    }
+
+    const maxBottom = viewportBottom
+    return clamp(startRect.height + dy, minHeight, maxBottom - startRect.top)
+}
+
+function addResizeHandle(panel, className, directions) {
+    if (panel.querySelector(`.${className}`)) return
+
+    const handle = document.createElement("div")
+    handle.className = `resize-handle ${className}`
+    handle.addEventListener("mousedown", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+
+        const startX = event.clientX
+        const startY = event.clientY
+        const rect = panel.getBoundingClientRect()
+
+        function onMouseMove(moveEvent) {
+            const dx = moveEvent.clientX - startX
+            const dy = moveEvent.clientY - startY
+            let nextWidth = rect.width
+            let nextHeight = rect.height
+            let nextLeft = rect.left
+
+            if (directions.includes("right") || directions.includes("left")) {
+                const horizontalLayout = applyHorizontalPanelLayout(panel, directions, rect, dx)
+                if (horizontalLayout) {
+                    nextWidth = horizontalLayout.width
+                    nextLeft = horizontalLayout.left
+                }
+            }
+
+            if (directions.includes("bottom")) {
+                nextHeight = applyVerticalPanelLayout(panel, rect, dy)
+            }
+
+            if (!directions.includes("left")) panel.style.width = `${Math.round(nextWidth)}px`
+            if (directions.includes("bottom")) panel.style.height = `${Math.round(nextHeight)}px`
+            if (directions.includes("left")) panel.style.left = `${Math.round(nextLeft)}px`
+        }
+
+        function onMouseUp() {
+            document.removeEventListener("mousemove", onMouseMove)
+            document.removeEventListener("mouseup", onMouseUp)
+        }
+
+        document.addEventListener("mousemove", onMouseMove)
+        document.addEventListener("mouseup", onMouseUp)
+    })
+
+    panel.appendChild(handle)
+}
+
+function installResizablePanels() {
+    const graphPanel = document.getElementById("container")
+    const chartPanel = document.getElementById("impulseChartContainer")
+    const editorPanel = document.getElementById("impulseEditor")
+
+    if (graphPanel) {
+        addResizeHandle(graphPanel, "resize-handle-right", ["right"])
+        addResizeHandle(graphPanel, "resize-handle-bottom", ["bottom"])
+        addResizeHandle(graphPanel, "resize-handle-bottom-right", ["right", "bottom"])
+    }
+
+    if (chartPanel) {
+        addResizeHandle(chartPanel, "resize-handle-left", ["left"])
+        addResizeHandle(chartPanel, "resize-handle-bottom", ["bottom"])
+        addResizeHandle(chartPanel, "resize-handle-bottom-left", ["left", "bottom"])
+    }
+
+    if (editorPanel) {
+        addResizeHandle(editorPanel, "resize-handle-left", ["left"])
+        addResizeHandle(editorPanel, "resize-handle-bottom", ["bottom"])
+        addResizeHandle(editorPanel, "resize-handle-bottom-left", ["left", "bottom"])
+    }
+}
+
+installResizablePanels()

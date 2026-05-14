@@ -84,7 +84,31 @@ function getImpulseChartColor(index) {
     return impulseChartColors[index % impulseChartColors.length];
 }
 
-export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber = 1, colorIndexes = null) {
+function getRoleLabel(role) {
+    if (role === "target") return "Целевые вершины";
+    if (role === "resource") return "Ресурсные вершины";
+    return "Прочие вершины";
+}
+
+function getRoleShortLabel(role) {
+    if (role === "target") return "цель";
+    if (role === "resource") return "ресурс";
+    return "прочее";
+}
+
+function getRoleStrokeDash(role) {
+    if (role === "resource") return "7 5";
+    if (role === "other") return "2 4";
+    return null;
+}
+
+function getRoleStrokeWidth(role) {
+    if (role === "target") return 2.4;
+    if (role === "resource") return 1.8;
+    return 1.5;
+}
+
+export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber = 1, colorIndexes = null, nodeRoles = null) {
     console.log(nodeNames)
     // Шаг 1: Подготовка контейнера
     let container = document.getElementById(idContainer);
@@ -209,18 +233,22 @@ export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber =
         .y(d => yScale(d));
 
     const lineColors = [];
+    const lineRoles = [];
 
     resMatrix.forEach((row, rowIndex) => {
         console.log(`Row ${rowIndex} data: ${row}`);
         const lineColor = getImpulseChartColor(colorIndexes?.[rowIndex] ?? rowIndex)
+        const lineRole = nodeRoles?.[rowIndex] ?? "other"
         lineColors[rowIndex] = lineColor
+        lineRoles[rowIndex] = lineRole
 
         // Добавление линии
         svg.append("path")
             .datum(row)
             .attr("fill", "none")
             .attr("stroke", lineColor)
-            .attr("stroke-width", 1.5)
+            .attr("stroke-width", getRoleStrokeWidth(lineRole))
+            .attr("stroke-dasharray", getRoleStrokeDash(lineRole))
             .attr("d", line);
 
         // Добавление точек
@@ -231,8 +259,10 @@ export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber =
             .attr("class", `row-${rowIndex}`)
             .attr("cx", (d, i) => xScale(i))
             .attr("cy", d => yScale(d))
-            .attr("r", 3)
+            .attr("r", lineRole === "target" ? 3.8 : 3)
             .attr("fill", lineColor)
+            .attr("stroke", lineRole === "target" ? "#111" : "none")
+            .attr("stroke-width", lineRole === "target" ? 0.8 : 0)
             .attr("title", nodeNames[rowIndex])
 
         /*
@@ -251,19 +281,41 @@ export function createChart(idContainer, resMatrix, nodeNames, firstStepNumber =
 
     const legend = document.createElement("div");
     legend.className = "impulse-chart-legend";
-    nodeNames.forEach((nodeName, index) => {
-        const item = document.createElement("span");
-        item.className = "impulse-chart-legend-item";
-        const swatch = document.createElement("span");
-        swatch.className = "impulse-chart-legend-swatch";
-        swatch.style.backgroundColor = lineColors[index];
-        const text = document.createElement("span");
-        text.className = "impulse-chart-legend-text";
-        text.style.color = lineColors[index];
-        text.textContent = nodeName;
-        item.appendChild(swatch);
-        item.appendChild(text);
-        legend.appendChild(item);
+    ["target", "resource", "other"].forEach(role => {
+        const indexes = nodeNames
+            .map((_, index) => index)
+            .filter(index => lineRoles[index] === role);
+
+        if (!indexes.length) return;
+
+        const group = document.createElement("div");
+        group.className = `impulse-chart-legend-group impulse-chart-legend-group-${role}`;
+
+        const title = document.createElement("div");
+        title.className = "impulse-chart-legend-title";
+        title.textContent = getRoleLabel(role);
+        group.appendChild(title);
+
+        indexes.forEach(index => {
+            const item = document.createElement("span");
+            item.className = "impulse-chart-legend-item";
+            const swatch = document.createElement("span");
+            swatch.className = `impulse-chart-legend-swatch impulse-chart-legend-swatch-${lineRoles[index]}`;
+            swatch.style.backgroundColor = lineColors[index];
+            const text = document.createElement("span");
+            text.className = "impulse-chart-legend-text";
+            text.style.color = lineColors[index];
+            text.textContent = nodeNames[index];
+            const badge = document.createElement("span");
+            badge.className = `impulse-chart-role-badge impulse-chart-role-${lineRoles[index]}`;
+            badge.textContent = getRoleShortLabel(lineRoles[index]);
+            item.appendChild(swatch);
+            item.appendChild(text);
+            item.appendChild(badge);
+            group.appendChild(item);
+        });
+
+        legend.appendChild(group);
     });
     container.appendChild(legend);
 }

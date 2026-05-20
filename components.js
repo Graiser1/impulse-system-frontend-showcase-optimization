@@ -47,6 +47,7 @@ export function createMatrixInput(idPrefix, idContainer, rowCount, columnCount, 
             // Устанавливаем уникальный id для каждого input
             input.id = `${idPrefix}Input:${i}-${j}`;
             input.type = 'number';
+            input.step = '1';
             cell.style.width = (100/(columnCount+1)).toString()+"%"
             cell.className = `${idPrefix}Column-${j+1}`;
             input.style.width = (90).toString()+"%"

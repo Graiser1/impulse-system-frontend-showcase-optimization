@@ -1,6 +1,6 @@
 # Project Audit and Handoff
 
-Last updated: 2026-05-15
+Last updated: 2026-05-18
 
 Repository: `Graiser1/impulse-system-frontend-showcase-optimization`
 
@@ -131,6 +131,8 @@ For npm in PowerShell, prefer `npm.cmd` because `npm.ps1` may be blocked by Exec
 - Added semantic roles for the current example graph:
 - target vertices: `Качество жизни`, `Уровень загрязнения`, `Отравляющие вещества`, `ЧС`.
 - resource vertices: `Цена квоты`, `Доп. Эмиссия`, `Кол-во авто`.
+- Node roles are now stored as explicit node metadata (`role: "target" | "resource" | "other"`) and can be edited in the node edit form.
+- Old/imported graphs without `role` still get roles inferred from the current example names for backward compatibility.
 - The impulse chart now separates target/resource/other vertices visually:
 - target series use thicker lines and emphasized points.
 - resource series use dashed lines.
@@ -166,10 +168,84 @@ For npm in PowerShell, prefer `npm.cmd` because `npm.ps1` may be blocked by Exec
 - it does not solve a full optimization problem, minimize cost, or guarantee that all target dynamics are achieved.
 - Treat this as an MVP/placeholder until the exact mathematical formulation is clarified.
 
+### May 18 inverse-task and role refinements
+
+- Continued the inverse-task work with the clarified assumption that the main requirement is qualitative direction/tendency, not exact target values.
+- Resource cost minimization is still out of scope.
+- Negative resource impulses are allowed.
+- The app still searches for one generated control program, not all possible programs.
+- Added explicit editable node roles to the graph data model:
+- `role: "target"` for target vertices.
+- `role: "resource"` for resource vertices.
+- `role: "other"` for ordinary vertices.
+- Added a role selector to the node edit form.
+- Updated `data2.json` so the default graph carries explicit roles.
+- Kept backward compatibility for old/imported graphs without `role` by falling back to name-based role inference.
+- Added subtle role styling on the main graph:
+- target nodes get a quiet green outline.
+- resource nodes get a quiet amber outline.
+- ordinary nodes get a very light neutral outline.
+- Improved the control-program form layout with clearer column headers:
+- target list: vertex and desired dynamics.
+- resource list: vertex, control steps, and impulse coefficient.
+- Removed redundant role badges from the separated target/resource lists.
+- Added a `выполнить все` button next to the single-step impulse button.
+- Added result checking for generated control programs:
+- after a control program is applied, the result block appears in the impulse controls.
+- after executing steps, each target is checked against its requested tendency.
+- the check compares the original target value before running control against the value at the requested target step.
+- `рост` is considered achieved if the value increased.
+- `снижение` is considered achieved if the value decreased.
+- This is a practical chart/result check, not a separate matrix proof.
+
+### May 20 inverse-task workflow, validation, and UI refinements
+
+- Expanded the inverse-task workflow from a single target step into a target interval:
+- the user now sets the tendency interval with separate `from` and `to` step inputs.
+- verification compares the value at the beginning of the selected interval with the value at its end.
+- the impulse chart range is synchronized to the selected target interval after a control program is applied.
+- Reworked the result-check block:
+- added a compact summary with achieved/failed target count.
+- the check table now shows target name, requested direction, value at the interval start, value at the interval end, delta, and status.
+- the check is still a direct model run with the generated impulses; it is not a formal proof.
+- Added the `Принятие программы` modal after all impulse steps are executed:
+- before user decision it shows the verification result only, for example `Все цели достигнуты`.
+- `Принять` reveals export actions.
+- `Не принять` reveals recalculation/exit actions.
+- export to JSON saves the graph, interval, targets, resources, impulse matrix, result values, and verification summary.
+- export to PNG saves the current impulse chart if available, otherwise the graph.
+- if verification fails after a generated control program run, one automatic recalculation attempt is made before the acceptance modal is shown.
+- Reworked the control-program search algorithm:
+- removed the old coarse `±k`, `±2k`, `±3k` coefficient concept from the UI.
+- removed the per-resource limit/coefficient input to reduce confusion.
+- automatic search now generates integer impulses in the range `-10..10`.
+- the algorithm estimates influence of each resource-step impulse on target interval deltas, creates an initial ridge-style solution, rounds to integers, then improves it with local integer search.
+- the score rewards achieving the requested target directions but penalizes overshooting, excessive impulse norm, too many active impulses, and a one-sided global impulse bias.
+- this is intended to produce livelier impulse tables and less monotone charts while staying understandable for users.
+- Added an explicit manual mode:
+- the checkbox changes the apply button to `Открыть ручной ввод`.
+- manual mode creates the impulse table without auto-generated values.
+- step execution now synchronizes directly from the visible table, so manual edits are used without an extra hidden confirmation step.
+- impulse inputs were returned to integer stepping.
+- Fixed impulse execution state issues:
+- generated and manually edited impulse values now stay synchronized with the internal `impulseMatrix`.
+- repeat entry into impulse mode resets the run controls, chart-node filter, result check, and acceptance state so old execute/chart controls do not appear prematurely.
+- Improved panel layout and resize behavior:
+- the workspace starts below the actual top menu height instead of a hard-coded top value.
+- the right-side chart/editor panels are initially expanded to use the available vertical space.
+- resize handles are positioned against actual panel bounds, rather than being carried inside scrollable panel content.
+- scroll behavior was reduced after the verification table was added:
+- the impulse table keeps horizontal scrolling for many steps.
+- the lower impulse editor avoids a separate vertical scrollbar inside the impulse table.
+- the verification table was compacted to reduce nested scrollbars.
+- The label `вернуться к редактированию графа` was changed to `задать программу управления`.
+- The control-program popup now closes automatically after applying a program.
+
 ## Current Git State
 
 Important recent commits:
 
+- `8131bf1 Add control program search prototype`
 - `931e63e Improve impulse chart controls`
 - `5fd771f Add project audit handoff`
 - `493eeca Improve editing and impulse chart controls`
@@ -177,7 +253,7 @@ Important recent commits:
 - `df605dd Improve graph layout and visuals`
 - `038e8dd Initial commit`
 
-At the time of this audit update, the May 15 UI, chart role, resizing, and inverse-task prototype changes are being committed locally.
+At the time of this audit update, the May 20 inverse-task workflow and UI refinement changes are being committed locally.
 
 ## Known Issues and Technical Debt
 
@@ -187,21 +263,21 @@ At the time of this audit update, the May 15 UI, chart role, resizing, and inver
 - Login/register buttons are hidden in the current UI.
 - `graphic.html` appears to be an old/unused separate page.
 - The impulse calculation logic is fragile and should be tested with known matrices before serious use.
-- The inverse control-program search is heuristic and should be reviewed against the teacher's intended mathematical formulation.
-- Target/resource roles are currently hard-coded for the default example names, including mojibake versions of those names. A future version should store roles as explicit node metadata instead of inferring them from labels.
+- The inverse control-program search is still heuristic and should be reviewed against the teacher's intended mathematical formulation. It now uses integer impulses and softer scoring, but it is not guaranteed to find a mathematically optimal control program.
+- Target/resource role fallback is still hard-coded for old/default graph names, including mojibake versions of those names. New saved graphs should carry explicit `role` metadata.
 - The resize/layout system is still based on absolute-positioned panels and custom drag handles. It is a pragmatic improvement, not a full responsive layout framework.
 - Some Russian UI strings are still mojibake in source files. Newer strings added in this session are normal UTF-8, so the project currently has mixed text quality.
 - Some old code paths remain in comments and legacy functions. Clean only after confirming behavior.
 
 ## Recommended Next Steps
 
-- Add an explicit "run all steps" button so users do not need to click `выполнить шаг` repeatedly.
+- Review the inverse-task result check with the teacher and confirm whether checking interval-start vs interval-end tendency is enough.
 - Clarify the inverse task with the teacher:
 - whether the desired dynamics are only qualitative (`рост`/`снижение`) or should include target values/thresholds.
 - whether resource costs/limits should be included.
 - whether the output should be one control program, all possible programs, or an optimized program.
-- whether impulse coefficients should be chosen by the user, solved by the program, or both.
-- Move target/resource classification into saved graph data once the expected workflow is clear.
+- whether impulse values should be integer-only in `-10..10`, solved continuously, or constrained differently.
+- Consider adding bulk role assignment or visual role editing directly on the graph if the workflow grows.
 - Remove or hide unused backend/auth UI unless a backend is part of the assignment.
 - Add lightweight manual test scenarios in `README.md`.
 - Consider extracting graph serialization, layout, impulse matrix math, and chart slicing into separate modules.

@@ -16,7 +16,7 @@
             <span class="status-label">Режим</span>
             <span id="status" class="status-value">status</span>
         </div>
-        <button id="returnEditNetworkButton">вернуться к редактированию графа</button>
+        <button id="returnEditNetworkButton">задать программу управления</button>
         <button id="controlProgramButton">поиск программы управления</button>
         <div id="network-edit-menu">
             <button id="addNewNodeButton">
@@ -113,11 +113,13 @@
                     <input id="chartStepToInput" type="number" min="1" value="10" title="Последний шаг на графике">
                 </div>
                 <button id="doImpulseStepButton">выполнить шаг</button>
+                <button id="doAllImpulseStepsButton">выполнить все</button>
                 <br>
                 <span id="impulseStepSpan">номер текущего шага: 0</span>
             </div>
         </div>
         <div id="impulseInputContainer"></div>
+        <div id="controlProgramResult" class="control-program-result"></div>
     </div>
 </div>
 
@@ -126,8 +128,13 @@
         <h1>Поиск программы управления</h1>
 
         <div class="control-program-row">
-            <label for="targetDynamicStepsInput"><b>Шаги динамики цели</b></label>
-            <input id="targetDynamicStepsInput" type="number" min="1" value="10">
+            <label><b>Отрезок динамики цели</b></label>
+            <div class="control-program-step-range">
+                <span>с</span>
+                <input id="targetDynamicFromStepInput" type="number" min="1" value="1">
+                <span>по</span>
+                <input id="targetDynamicToStepInput" type="number" min="1" value="10">
+            </div>
         </div>
 
         <label><b>Целевые вершины</b></label>
@@ -136,11 +143,32 @@
         <label><b>Ресурсные вершины и шаги управления</b></label>
         <div id="controlResourceList" class="control-program-list"></div>
 
+        <label class="control-program-manual-toggle">
+            <input id="controlProgramManualModeInput" type="checkbox">
+            <span>Ручной ввод импульсов</span>
+        </label>
+
         <span id="controlProgramStatus" class="control-program-status"></span>
 
         <div class="control-program-actions">
             <button id="applyControlProgramButton" type="button" class="btn">Подставить</button>
             <button id="controlProgramCloseButton" type="button" class="btn cancel">Закрыть</button>
+        </div>
+    </form>
+</div>
+
+<div class="form-popup control-acceptance-popup" id="controlAcceptanceForm">
+    <form action="/action_page.php" class="form-container control-acceptance-container">
+        <h1>Принятие программы</h1>
+        <div id="controlAcceptanceStatus" class="control-acceptance-status"></div>
+        <div id="controlAcceptanceDetails" class="control-acceptance-details"></div>
+        <div class="control-acceptance-actions">
+            <button id="controlAcceptanceAcceptButton" type="button" class="btn">Принять</button>
+            <button id="controlAcceptanceRejectButton" type="button" class="btn cancel">Не принять</button>
+            <button id="controlAcceptanceSaveFileButton" type="button" class="btn control-acceptance-after-accept">Сохранить в файл</button>
+            <button id="controlAcceptanceSaveImageButton" type="button" class="btn control-acceptance-after-accept">Сохранить как изображение</button>
+            <button id="controlAcceptanceRecalculateButton" type="button" class="btn control-acceptance-after-reject">Перерасчет</button>
+            <button id="controlAcceptanceCloseButton" type="button" class="btn cancel control-acceptance-after-decision">Выйти</button>
         </div>
     </form>
 </div>
@@ -155,6 +183,13 @@
 
         <label for="editNodeValueInput"><b>Node value</b></label>
         <input id="editNodeValueInput" type="number" placeholder="Enter node value" name="nodeValue" required>
+
+        <label for="editNodeRoleSelect"><b>Node role</b></label>
+        <select id="editNodeRoleSelect" name="nodeRole">
+            <option value="other">Обычная</option>
+            <option value="target">Целевая</option>
+            <option value="resource">Ресурсная</option>
+        </select>
 
         <button id="submitEditNodeButton" type="button" class="btn">Submit</button>
         <button id="deleteNodeButton" type="button" class="btn">Delete</button>

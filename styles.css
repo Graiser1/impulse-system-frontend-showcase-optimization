@@ -1,23 +1,23 @@
 #container{
   width: 96%;
-  height: 83%;
+  height: calc(100vh - 112px);
   border: #1f77b4  10px solid;
   background-color: #ddd;
   display: flex;
   justify-content: center;
   overflow: auto;
   position: absolute;
-  top: 12%; left: 1%;
+  top: 100px; left: 12px;
   min-width: 300px;
   min-height: 280px;
   max-width: 96vw;
-  max-height: 86vh;
+  max-height: calc(100vh - 112px);
   box-sizing: border-box;
 }
 
 #impulseChartContainer{
   width: 35%;
-  height: 48%;
+  height: calc((100vh - 124px) / 2);
   border: #1f77b4  10px solid;
   background-color: #ddd;
   display: none;
@@ -25,28 +25,31 @@
   align-items: center;
   justify-content: flex-start;
   position: absolute;
-  top: 12%; left: 62%;
+  top: 100px; left: 62%;
   overflow: auto;
   min-width: 280px;
   min-height: 240px;
   max-width: 96vw;
-  max-height: 86vh;
+  max-height: calc(100vh - 112px);
   box-sizing: border-box;
   padding-bottom: 10px;
 }
 
 .impulseEditor{
   width: 35%;
-  height: 35%;
+  height: calc((100vh - 124px) / 2);
   background-color: #ddd;
   display: none;
+  flex-direction: column;
+  gap: 6px;
   position: absolute;
-  top: 60%; left: 62%;
-  overflow: auto;
+  top: calc(100px + ((100vh - 124px) / 2) + 12px); left: 62%;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-width: 280px;
   min-height: 180px;
   max-width: 96vw;
-  max-height: 86vh;
+  max-height: calc(100vh - 112px);
   box-sizing: border-box;
 }
 
@@ -57,47 +60,37 @@ svg{
 .resize-handle{
   background-color: rgba(31, 119, 180, 0.85);
   border-radius: 2px;
-  position: absolute;
+  position: fixed;
   z-index: 20;
 }
 
 .resize-handle-right{
   cursor: ew-resize;
   height: 48px;
-  right: 0;
-  top: calc(50% - 24px);
   width: 7px;
 }
 
 .resize-handle-left{
   cursor: ew-resize;
   height: 48px;
-  left: 0;
-  top: calc(50% - 24px);
   width: 7px;
 }
 
 .resize-handle-bottom{
-  bottom: 0;
   cursor: ns-resize;
   height: 7px;
-  left: calc(50% - 24px);
   width: 48px;
 }
 
 .resize-handle-bottom-right{
-  bottom: 0;
   cursor: nwse-resize;
   height: 16px;
-  right: 0;
   width: 16px;
 }
 
 .resize-handle-bottom-left{
-  bottom: 0;
   cursor: nesw-resize;
   height: 16px;
-  left: 0;
   width: 16px;
 }
 
@@ -318,8 +311,21 @@ html {
   background: #f1f1f1;
 }
 
+.form-container select {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0 18px 0;
+  border: none;
+  background: #f1f1f1;
+}
+
 /* When the inputs get focus, do something */
 .form-container input[type=text]:focus, .form-container input[type=password]:focus {
+  background-color: #ddd;
+  outline: none;
+}
+
+.form-container select:focus {
   background-color: #ddd;
   outline: none;
 }
@@ -350,6 +356,9 @@ button:active {
 
 .impulseEditor-header{
   display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: space-evenly;
   align-content: center;
   align-items: center;
@@ -361,9 +370,12 @@ button:active {
 }
 
 #impulseInputContainer{
+  flex: 0 0 auto;
   max-width: 100%;
+  min-height: 0;
+  max-height: 48%;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 #impulseInputContainer table{
@@ -378,6 +390,107 @@ button:active {
 
 #doImpulseStepButton{
   background-color: red;
+}
+
+#doAllImpulseStepsButton{
+  background-color: #0f766e;
+  margin-top: 4px;
+}
+
+.control-program-result{
+  background-color: rgba(255, 255, 255, 0.76);
+  border: 1px solid #cbd5e1;
+  box-sizing: border-box;
+  color: #0f172a;
+  flex: 0 0 auto;
+  margin: 0 8px 8px;
+  max-height: none;
+  overflow: visible;
+  padding: 4px 6px;
+  text-align: left;
+  width: calc(100% - 16px);
+}
+
+.control-program-result:empty{
+  display: none;
+}
+
+.control-program-result-title{
+  color: #475569;
+  font-size: 9px;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.control-program-result-note{
+  color: #334155;
+  display: none;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  text-transform: none;
+}
+
+.control-program-summary{
+  border-radius: 3px;
+  font-size: 10px;
+  margin-bottom: 4px;
+  padding: 3px 5px;
+}
+
+.control-program-summary-ok{
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.control-program-summary-fail{
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.control-program-result-table{
+  border-collapse: collapse;
+  color: #0f172a;
+  font-size: 9px;
+  margin: 0;
+  min-width: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.control-program-result-table th,
+.control-program-result-table td{
+  border: 1px solid #cbd5e1;
+  padding: 2px 3px;
+  text-align: center;
+}
+
+.control-program-result-table th{
+  background-color: #e2e8f0;
+  color: #334155;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.control-program-result-table th:first-child,
+.control-program-result-table td:first-child{
+  text-align: left;
+  width: 32%;
+}
+
+.control-program-result-name{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-program-result-ok{
+  color: #166534;
+}
+
+.control-program-result-fail{
+  color: #991b1b;
 }
 
 .activeColumn{
@@ -592,12 +705,25 @@ button:active {
   display: none;
 }
 
+#controlAcceptanceForm{
+  background-color: #f1f1f1;
+  display: none;
+}
+
 .control-program-popup{
   height: 560px;
   left: 32%;
   top: 16%;
   width: 520px;
   z-index: 80;
+}
+
+.control-acceptance-popup{
+  height: auto;
+  left: 30%;
+  top: 18%;
+  width: 560px;
+  z-index: 90;
 }
 
 .control-program-container{
@@ -607,13 +733,104 @@ button:active {
   width: 100%;
 }
 
+.control-acceptance-container{
+  box-sizing: border-box;
+  max-width: none;
+  width: 100%;
+}
+
 .control-program-container h1{
   font-size: 18px;
   margin: 0 0 12px;
 }
 
+.control-acceptance-container h1{
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+.control-acceptance-status{
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding: 8px;
+}
+
+.control-acceptance-status-ok{
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.control-acceptance-status-fail{
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.control-acceptance-status-warn{
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.control-acceptance-details{
+  max-height: 240px;
+  overflow: auto;
+}
+
+.control-acceptance-meta{
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.control-acceptance-table{
+  border-collapse: collapse;
+  font-size: 11px;
+  margin: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.control-acceptance-table th,
+.control-acceptance-table td{
+  border: 1px solid #cbd5e1;
+  padding: 4px;
+}
+
+.control-acceptance-table th{
+  background-color: #e2e8f0;
+  color: #334155;
+}
+
+.control-acceptance-actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.control-acceptance-after-accept,
+.control-acceptance-after-reject,
+.control-acceptance-after-decision{
+  display: none;
+}
+
 .control-program-row{
   margin-bottom: 10px;
+}
+
+.control-program-step-range{
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto 72px auto 72px;
+  margin-top: 4px;
+}
+
+.control-program-step-range input{
+  width: 100%;
 }
 
 .control-program-list{
@@ -633,12 +850,34 @@ button:active {
   margin-bottom: 5px;
 }
 
+.control-program-list-header{
+  align-items: center;
+  color: #64748b;
+  display: grid;
+  font-size: 10px;
+  gap: 6px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
 .control-program-target-item{
-  grid-template-columns: auto minmax(0, 1fr) 96px 64px;
+  grid-template-columns: auto minmax(0, 1fr) 104px;
 }
 
 .control-program-resource-item{
-  grid-template-columns: auto minmax(0, 1fr) 96px 72px;
+  grid-template-columns: auto minmax(0, 1fr) 120px;
+}
+
+.control-program-manual-toggle{
+  align-items: center;
+  color: #111;
+  display: flex;
+  gap: 6px;
+  margin: -2px 0 10px;
+}
+
+.control-program-manual-toggle input{
+  width: auto;
 }
 
 .control-program-item input[type="checkbox"]{

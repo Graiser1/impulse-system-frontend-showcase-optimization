@@ -90,6 +90,7 @@ console.log(color)
 var links = data.links.map(d => ({ ...d }));
 var nodes = data.nodes.map(d => ({ ...d }));
 
+normalizeGraphNodes();
 spreadInitialNodes();
 
 function getNodeId(nodeOrId) {
@@ -104,9 +105,49 @@ function getLinkTargetId(link) {
     return getNodeId(link.target);
 }
 
+function isKnownNodeRole(role) {
+    return role === "target" || role === "resource" || role === "other";
+}
+
+function inferNodeRoleByName(node) {
+    const targetNames = new Set([
+        "РЈСЂРѕРІРµРЅСЊ Р·Р°РіСЂСЏР·РЅРµРЅРёСЏ",
+        "РљР°С‡РµСЃС‚РІРѕ Р¶РёР·РЅРё",
+        "РћС‚СЂР°РІР»СЏСЋС‰РёРµ РІРµС‰РµСЃС‚РІР°",
+        "Р§РЎ",
+        "Р Р€РЎР‚Р С•Р Р†Р ВµР Р…РЎРЉ Р В·Р В°Р С–РЎР‚РЎРЏР В·Р Р…Р ВµР Р…Р С‘РЎРЏ",
+        "Р С™Р В°РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р С• Р В¶Р С‘Р В·Р Р…Р С‘",
+        "Р С›РЎвЂљРЎР‚Р В°Р Р†Р В»РЎРЏРЎР‹РЎвЂ°Р С‘Р Вµ Р Р†Р ВµРЎвЂ°Р ВµРЎРѓРЎвЂљР Р†Р В°",
+        "Р В§Р РЋ"
+    ])
+
+    const resourceNames = new Set([
+        "Р¦РµРЅР° РєРІРѕС‚С‹",
+        "Р”РѕРї. Р­РјРёСЃСЃРёСЏ",
+        "РљРѕР»-РІРѕ Р°РІС‚Рѕ",
+        "Р В¦Р ВµР Р…Р В° Р С”Р Р†Р С•РЎвЂљРЎвЂ№",
+        "Р вЂќР С•Р С—. Р В­Р СР С‘РЎРѓРЎРѓР С‘РЎРЏ",
+        "Р С™Р С•Р В»-Р Р†Р С• Р В°Р Р†РЎвЂљР С•"
+    ])
+
+    if (targetNames.has(node?.text)) return "target";
+    if (resourceNames.has(node?.text)) return "resource";
+    return "other";
+}
+
+function normalizeNodeRole(node) {
+    const role = isKnownNodeRole(node?.role) ? node.role : inferNodeRoleByName(node);
+    node.role = role;
+    return node;
+}
+
+function normalizeGraphNodes() {
+    nodes.forEach(normalizeNodeRole);
+}
+
 function serializeGraph() {
     return {
-        nodes: nodes.map(node => ({ ...node, fx: null, fy: null })),
+        nodes: nodes.map(node => ({ ...normalizeNodeRole({ ...node }), fx: null, fy: null })),
         links: links.map(link => ({
             source: getLinkSourceId(link),
             target: getLinkTargetId(link),
@@ -122,6 +163,19 @@ function getLinkColor(link) {
 
 function getLinkMarkerId(link) {
     return Number(link.value) > 0 ? "arrowhead-positive" : "arrowhead-negative";
+}
+
+function getNodeRoleStroke(node) {
+    const role = getNodeChartRole(node)
+    if (role === "target") return "#15803d"
+    if (role === "resource") return "#b45309"
+    return "rgba(15, 23, 42, 0.18)"
+}
+
+function getNodeRoleStrokeWidth(node) {
+    const role = getNodeChartRole(node)
+    if (role === "target" || role === "resource") return 2.2
+    return 1
 }
 
 function spreadInitialNodes() {
@@ -309,13 +363,13 @@ function bindLinkEvents(selection) {
 }
 
 var node = svg.append("g")
-    .attr("stroke", "none")
-    .attr("stroke-width", 0)
     .selectAll()
     .data(nodes)
     .join("circle")
     .attr("r", nodeRadius)
     .attr("fill", d => color((d.value-minNodeValue)/(maxNodeValue-minNodeValue+1)))
+    .attr("stroke", getNodeRoleStroke)
+    .attr("stroke-width", getNodeRoleStrokeWidth)
     .call(bindNodeEvents);
 
 function updateNodeView(){
@@ -327,10 +381,15 @@ function updateNodeView(){
                     console.log(d)
                     return color((d.value-minNodeValue)/(maxNodeValue-minNodeValue+1))
                 }
-                ).call(bindNodeEvents)
+                )
+                .attr("stroke", getNodeRoleStroke)
+                .attr("stroke-width", getNodeRoleStrokeWidth)
+                .call(bindNodeEvents)
                 .call(enter => enter.transition().attr("r", nodeRadius)),
             update => update.transition() // Добавляем переход для плавного обновления
                 .attr("fill", d => color((d.value-minNodeValue)/(maxNodeValue-minNodeValue+1))) // Обновляем цвет для существующих узлов,
+                .attr("stroke", getNodeRoleStroke)
+                .attr("stroke-width", getNodeRoleStrokeWidth)
                 .call(update => update.attr("r", nodeRadius)),
             exit => exit.remove()
         );
@@ -675,6 +734,7 @@ function openNodeEditor(nodeData) {
     tempNodeForEdit = nodeData
     document.getElementById("editNodeNameInput").value = nodeData.text
     document.getElementById("editNodeValueInput").value = nodeData.value
+    document.getElementById("editNodeRoleSelect").value = getNodeChartRole(nodeData)
     openForm()
 }
 
@@ -695,6 +755,7 @@ function mousemoved(event) {
 }
 
 function spawn(source) {
+    normalizeNodeRole(source)
     if (isLayoutLocked) {
         fixNodePosition(source)
     }
@@ -705,6 +766,7 @@ function spawn(source) {
 
 function reRender() {
     console.log("rerender!!!")
+    normalizeGraphNodes()
     links.forEach(link => {
         link.source = nodes.find(node => node.id === getLinkSourceId(link)) || link.source;
         link.target = nodes.find(node => node.id === getLinkTargetId(link)) || link.target;
@@ -818,9 +880,10 @@ impulseSubmitButton.addEventListener('click', () => {
         // Добавляем объекты в строки
         for (let j = 0; j < impulseSteps; j++) {
             let id = "impulseInput:"+i+"-"+j
-            if(isNaN(parseInt(document.getElementById(id).value))) {row.push(0)}
+            const impulseValue = Number(document.getElementById(id).value)
+            if(!Number.isFinite(impulseValue)) {row.push(0)}
             else{
-                row.push(parseInt(document.getElementById(id).value));}
+                row.push(impulseValue);}
         }
         impulseMatrix.push(row);
     }
@@ -848,6 +911,10 @@ function updateImpulseControlsVisibility() {
     if (document.getElementById("impulseRemoveStepButton")) document.getElementById("impulseRemoveStepButton").style.visibility = hasSteps ? "visible" : "hidden"
     document.getElementById("impulseForNodeContainer").style.visibility = hasSteps ? "visible" : "hidden"
     document.getElementById("impulseSubmitButton").style.visibility = hasSteps ? "visible" : "hidden"
+    if (!hasSteps) {
+        document.getElementById("doImpuleStepContainer").style.visibility = "hidden"
+        document.getElementById("doImpulseStepButton").style.visibility = "hidden"
+    }
 }
 
 function showSelectedImpulseRows() {
@@ -933,6 +1000,28 @@ document.getElementById("chartStepToInput").addEventListener('keydown', updateCh
 controlProgramButton.addEventListener('click', openControlProgramForm)
 controlProgramCloseButton.addEventListener('click', closeControlProgramForm)
 applyControlProgramButton.addEventListener('click', applyControlProgram)
+controlProgramManualModeInput.addEventListener('change', updateControlProgramModeView)
+controlAcceptanceAcceptButton.addEventListener('click', () => {
+    controlProgramAcceptanceDecision = "accepted"
+    renderControlAcceptanceActions()
+    renderControlAcceptanceWindow("Программа принята. Теперь результат можно сохранить.")
+})
+controlAcceptanceRejectButton.addEventListener('click', () => {
+    controlProgramAcceptanceDecision = "rejected"
+    renderControlAcceptanceActions()
+    renderControlAcceptanceWindow("Программа не принята. Можно выполнить перерасчет или выйти.")
+})
+controlAcceptanceCloseButton.addEventListener('click', closeControlAcceptanceWindow)
+controlAcceptanceSaveFileButton.addEventListener('click', saveAcceptedControlProgramToFile)
+controlAcceptanceSaveImageButton.addEventListener('click', saveCurrentProgramImage)
+controlAcceptanceRecalculateButton.addEventListener('click', () => {
+    if (!recalculateControlProgram(3)) return
+    controlProgramAutoRecalculated = true
+    controlProgramAcceptanceDecision = null
+    runAllImpulseStepsWithoutAcceptance()
+    renderControlProgramResult()
+    renderControlAcceptanceWindow()
+})
 
 //ADD IMPULSE FOR NODE BUTTON
 impulseAddNodeButton.addEventListener('click', () => {
@@ -1020,6 +1109,7 @@ submitEditNodeButton.addEventListener('click', () => {
         if (element.id == tempNodeForEdit.id) {
             element.text = document.getElementById("editNodeNameInput").value
             element.value = Number(document.getElementById("editNodeValueInput").value)
+            element.role = document.getElementById("editNodeRoleSelect").value
         }
     });
     reRender()
@@ -1115,6 +1205,11 @@ var resValues = [];
 var selectedChartNodeIds = new Set();
 var chartNodeFilterInitialized = false;
 var isChartNodeFilterOpen = false;
+var lastControlProgramCheck = null;
+var lastControlProgramSearch = null;
+var lastControlProgramVerification = null;
+var controlProgramAutoRecalculated = false;
+var controlProgramAcceptanceDecision = null;
 
 function getNodeNamesForChart() {
     let nodeNames = [];
@@ -1125,6 +1220,7 @@ function getNodeNamesForChart() {
 }
 
 function getNodeChartRole(node) {
+    if (isKnownNodeRole(node?.role)) return node.role
     const targetNames = new Set([
         "Уровень загрязнения",
         "Качество жизни",
@@ -1210,8 +1306,20 @@ function renderControlProgramForm() {
     targetList.innerHTML = ""
     resourceList.innerHTML = ""
 
+    const targetHeader = document.createElement("div")
+    targetHeader.className = "control-program-list-header control-program-target-item"
+    targetHeader.innerHTML = "<span></span><span>Вершина</span><span>Динамика</span>"
+    targetList.appendChild(targetHeader)
+
+    const resourceHeader = document.createElement("div")
+    resourceHeader.className = "control-program-list-header control-program-resource-item"
+    resourceHeader.innerHTML = "<span></span><span>Вершина</span><span>Шаги</span>"
+    resourceList.appendChild(resourceHeader)
+
     const defaultSteps = Math.max(impulseSteps || 10, 1)
-    document.getElementById("targetDynamicStepsInput").value = defaultSteps
+    document.getElementById("targetDynamicFromStepInput").value = 1
+    document.getElementById("targetDynamicToStepInput").value = defaultSteps
+    document.getElementById("controlProgramManualModeInput").checked = false
 
     nodes.forEach((node, index) => {
         const role = getNodeChartRole(node)
@@ -1243,35 +1351,35 @@ function renderControlProgramForm() {
 
     targetList.querySelectorAll(".control-program-item").forEach(item => {
         if (!item.querySelector(".chart-node-role-target")) item.remove()
-        else item.classList.add("control-program-target-item")
+        else {
+            item.classList.add("control-program-target-item")
+            const roleBadge = item.querySelector(".chart-node-role-badge")
+            if (roleBadge) roleBadge.remove()
+        }
     })
     resourceList.querySelectorAll(".control-program-item").forEach(item => {
         if (!item.querySelector(".chart-node-role-resource")) item.remove()
         else item.classList.add("control-program-resource-item")
     })
-    resourceList.querySelectorAll(".control-program-item").forEach(item => {
-        const index = item.querySelector(".control-resource-checkbox")?.dataset.nodeIndex
-        if (!index) return
-        const roleBadge = item.querySelector(".chart-node-role-badge")
-        if (roleBadge) roleBadge.remove()
-        const strengthInput = document.createElement("input")
-        strengthInput.className = "control-resource-strength"
-        strengthInput.type = "number"
-        strengthInput.dataset.nodeIndex = index
-        strengthInput.value = "1"
-        strengthInput.step = "1"
-        strengthInput.title = "Коэффициент импульса"
-        item.appendChild(strengthInput)
-    })
+    resourceList.querySelectorAll(".control-program-item .chart-node-role-badge").forEach(roleBadge => roleBadge.remove())
 
-    if (!targetList.children.length) {
+    if (!targetList.querySelector(".control-program-item")) {
         targetList.textContent = "Целевые вершины не найдены."
     }
-    if (!resourceList.children.length) {
+    if (!resourceList.querySelector(".control-program-item")) {
         resourceList.textContent = "Ресурсные вершины не найдены."
     }
 
-    document.getElementById("controlProgramStatus").textContent = "Выберите цели, ресурсы и шаги управления."
+    updateControlProgramModeView()
+}
+
+function updateControlProgramModeView() {
+    const manualMode = document.getElementById("controlProgramManualModeInput")?.checked || false
+    const applyButton = document.getElementById("applyControlProgramButton")
+    if (applyButton) applyButton.textContent = manualMode ? "Открыть ручной ввод" : "Подставить автоматически"
+    document.getElementById("controlProgramStatus").textContent = manualMode
+        ? "Ручной режим: будет создана таблица импульсов, значения нужно будет ввести самостоятельно."
+        : "Автоматический режим: программа подберет целые импульсы от -10 до 10."
 }
 
 function openControlProgramForm() {
@@ -1286,7 +1394,12 @@ function closeControlProgramForm() {
 }
 
 function getControlProgramSelections() {
-    const targetSteps = Math.max(1, Number.parseInt(document.getElementById("targetDynamicStepsInput").value) || 1)
+    const rawTargetFromStep = Number.parseInt(document.getElementById("targetDynamicFromStepInput").value) || 1
+    const rawTargetToStep = Number.parseInt(document.getElementById("targetDynamicToStepInput").value) || rawTargetFromStep
+    const targetFromStep = Math.max(1, Math.min(rawTargetFromStep, rawTargetToStep))
+    const targetToStep = Math.max(targetFromStep, rawTargetFromStep, rawTargetToStep)
+    document.getElementById("targetDynamicFromStepInput").value = targetFromStep
+    document.getElementById("targetDynamicToStepInput").value = targetToStep
     const targets = [...document.querySelectorAll(".control-target-checkbox")]
         .filter(input => input.checked)
         .map(input => {
@@ -1300,16 +1413,16 @@ function getControlProgramSelections() {
         .map(input => {
             const index = Number.parseInt(input.dataset.nodeIndex)
             const rawSteps = document.querySelector(`.control-resource-steps[data-node-index="${index}"]`).value
-            const strength = Number(document.querySelector(`.control-resource-strength[data-node-index="${index}"]`)?.value)
             return {
                 index,
-                steps: parseControlSteps(rawSteps, targetSteps),
-                strength: Number.isFinite(strength) ? strength : 1
+                steps: parseControlSteps(rawSteps, targetToStep),
+                strength: 1
             }
         })
         .filter(resource => resource.steps.length)
 
-    return { targetSteps, targets, resources }
+    const manualMode = document.getElementById("controlProgramManualModeInput")?.checked || false
+    return { targetFromStep, targetToStep, targets, resources, manualMode }
 }
 
 function clearImpulseInputs() {
@@ -1321,8 +1434,415 @@ function clearImpulseInputs() {
     }
 }
 
+function getBaseNodeColumn() {
+    fillNodeAndLinkMaps()
+    return nodes.map(node => [Number(node.value)])
+}
+
+function calculateImpulseResultValues(candidateImpulseMatrix, totalSteps) {
+    fillNodeMatrix()
+    const calculationMatrix = transpose(nodeMatrix)
+    const baseColumn = getBaseNodeColumn()
+    const resultValues = nodes.map(() => [])
+
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
+        let resultColumn
+        if (stepIndex === 0) {
+            resultColumn = addMatrices(baseColumn, getColumnMatrix(candidateImpulseMatrix, 0))
+        } else {
+            resultColumn = getColumnMatrix(resultValues, stepIndex - 1)
+            for (let impulseIndex = 0; impulseIndex <= stepIndex; impulseIndex++) {
+                const matrixPowerValue = matrixPower(calculationMatrix, stepIndex - impulseIndex)
+                const impulseContribution = multiplyMatrices(matrixPowerValue, getColumnMatrix(candidateImpulseMatrix, impulseIndex))
+                resultColumn = addMatrices(resultColumn, impulseContribution)
+            }
+        }
+
+        resultColumn.forEach((row, nodeIndex) => {
+            resultValues[nodeIndex].push(row[0])
+        })
+    }
+
+    return resultValues
+}
+
+function getControlProgramStepValue(resultValues, nodeIndex, step, fallbackValue) {
+    const value = resultValues[nodeIndex]?.[step - 1]
+    return Number.isFinite(Number(value)) ? Number(value) : fallbackValue
+}
+
+function evaluateControlProgram(candidateImpulseMatrix, targets, targetFromStep, targetToStep, totalSteps) {
+    const resultValues = calculateImpulseResultValues(candidateImpulseMatrix, totalSteps)
+    const fromStep = Math.min(targetFromStep, totalSteps)
+    const toStep = Math.min(targetToStep, totalSteps)
+    let achievedCount = 0
+    let directionScore = 0
+
+    targets.forEach(target => {
+        const fallbackValue = Number(nodesNumberNodeMap.get(target.index)?.value ?? 0)
+        const startValue = getControlProgramStepValue(resultValues, target.index, fromStep, fallbackValue)
+        const endValue = getControlProgramStepValue(resultValues, target.index, toStep, startValue)
+        const directedDelta = (endValue - startValue) * target.direction
+        if (directedDelta > 0) achievedCount++
+        directionScore += directedDelta
+    })
+
+    return { achievedCount, directionScore, resultValues }
+}
+
+function isControlProgramScoreBetter(candidateScore, bestScore) {
+    if (!bestScore) return true
+    if (candidateScore.achievedCount !== bestScore.achievedCount) {
+        return candidateScore.achievedCount > bestScore.achievedCount
+    }
+    return candidateScore.directionScore > bestScore.directionScore
+}
+
+function getControlProgramVariables(resources, totalSteps) {
+    const variables = []
+    resources.forEach(resource => {
+        resource.steps.forEach(step => {
+            const columnIndex = step - 1
+            if (columnIndex >= 0 && columnIndex < totalSteps) {
+                variables.push({ nodeIndex: resource.index, columnIndex, magnitude: 10 })
+            }
+        })
+    })
+    return variables
+}
+
+function getControlProgramTargetDelta(resultValues, target, fromStep, toStep) {
+    const fallbackValue = Number(nodesNumberNodeMap.get(target.index)?.value ?? 0)
+    const startValue = getControlProgramStepValue(resultValues, target.index, fromStep, fallbackValue)
+    const endValue = getControlProgramStepValue(resultValues, target.index, toStep, startValue)
+    return endValue - startValue
+}
+
+function solveLinearSystem(matrix, vector) {
+    const size = vector.length
+    const augmented = matrix.map((row, index) => [...row, vector[index]])
+
+    for (let column = 0; column < size; column++) {
+        let pivotRow = column
+        for (let row = column + 1; row < size; row++) {
+            if (Math.abs(augmented[row][column]) > Math.abs(augmented[pivotRow][column])) {
+                pivotRow = row
+            }
+        }
+
+        if (Math.abs(augmented[pivotRow][column]) < 1e-9) continue
+        if (pivotRow !== column) {
+            const temp = augmented[column]
+            augmented[column] = augmented[pivotRow]
+            augmented[pivotRow] = temp
+        }
+
+        const pivot = augmented[column][column]
+        for (let col = column; col <= size; col++) augmented[column][col] /= pivot
+
+        for (let row = 0; row < size; row++) {
+            if (row === column) continue
+            const factor = augmented[row][column]
+            for (let col = column; col <= size; col++) {
+                augmented[row][col] -= factor * augmented[column][col]
+            }
+        }
+    }
+
+    return augmented.map(row => Number.isFinite(row[size]) ? row[size] : 0)
+}
+
+function solveRidgeLeastSquares(influenceMatrix, targetVector, variables, options = {}) {
+    const variableCount = variables.length
+    const targetCount = targetVector.length
+    if (!variableCount) return []
+
+    const regularization = Number(options.regularization) || 0.35
+    const normalMatrix = Array.from({ length: variableCount }, () => Array(variableCount).fill(0))
+    const normalVector = Array(variableCount).fill(0)
+
+    for (let i = 0; i < variableCount; i++) {
+        for (let targetIndex = 0; targetIndex < targetCount; targetIndex++) {
+            const influence = influenceMatrix[targetIndex][i]
+            normalVector[i] += influence * targetVector[targetIndex]
+            for (let j = 0; j < variableCount; j++) {
+                normalMatrix[i][j] += influence * influenceMatrix[targetIndex][j]
+            }
+        }
+        const magnitude = Math.max(0.001, variables[i].magnitude)
+        normalMatrix[i][i] += regularization / (magnitude * magnitude)
+    }
+
+    return solveLinearSystem(normalMatrix, normalVector)
+}
+
+function createControlMatrixFromVector(solution, variables, totalSteps, multiplier = 1, limitMultiplier = 1.5) {
+    const candidateMatrix = nodes.map(() => Array(totalSteps).fill(0))
+    variables.forEach((variable, index) => {
+        const limit = variable.magnitude * limitMultiplier
+        const rawValue = (Number(solution[index]) || 0) * multiplier
+        const value = clamp(rawValue, -limit, limit)
+        candidateMatrix[variable.nodeIndex][variable.columnIndex] = Math.abs(value) < 1e-6 ? 0 : Number(value.toFixed(3))
+    })
+    return candidateMatrix
+}
+
+function getControlMatrixNorm(impulseMatrix) {
+    let sum = 0
+    impulseMatrix.forEach(row => row.forEach(value => {
+        sum += Number(value) * Number(value)
+    }))
+    return Math.sqrt(sum)
+}
+
+function getControlProgramDesiredDeltas(zeroScore, targets, fromStep, toStep) {
+    return targets.map(target => {
+        const fallbackValue = Number(nodesNumberNodeMap.get(target.index)?.value ?? 0)
+        const startValue = getControlProgramStepValue(zeroScore.resultValues, target.index, fromStep, fallbackValue)
+        const endValue = getControlProgramStepValue(zeroScore.resultValues, target.index, toStep, startValue)
+        const baselineDelta = endValue - startValue
+        const scale = Math.max(1, Math.abs(startValue), Math.abs(endValue))
+        const desiredDirectedDelta = Math.max(1, Math.round(scale * 0.08))
+        const baselineDirectedDelta = baselineDelta * target.direction
+        if (baselineDirectedDelta > 0) return baselineDelta
+        return target.direction * desiredDirectedDelta
+    })
+}
+
+function scoreIntegerControlProgram(score, targets, targetFromStep, targetToStep, totalSteps, impulseMatrix, desiredDeltas) {
+    const fromStep = Math.min(targetFromStep, totalSteps)
+    const toStep = Math.min(targetToStep, totalSteps)
+    let objective = 0
+    let achievedCount = 0
+    let directionScore = 0
+
+    targets.forEach((target, index) => {
+        const delta = getControlProgramTargetDelta(score.resultValues, target, fromStep, toStep)
+        const directedDelta = delta * target.direction
+        const desiredDirectedDelta = desiredDeltas[index] * target.direction
+        if (directedDelta > 0) achievedCount++
+        directionScore += directedDelta
+
+        const underShoot = Math.max(0, desiredDirectedDelta - directedDelta)
+        const overShoot = Math.max(0, directedDelta - desiredDirectedDelta)
+        objective += directedDelta > 0 ? 140 : -140
+        objective -= underShoot * 18
+        objective -= overShoot * 4
+    })
+
+    const norm = getControlMatrixNorm(impulseMatrix)
+    const signedStepTotals = Array(totalSteps).fill(0)
+    let activeCount = 0
+    impulseMatrix.forEach(row => row.forEach((value, stepIndex) => {
+        if (value !== 0) activeCount++
+        signedStepTotals[stepIndex] += value
+    }))
+    const directionBias = signedStepTotals.reduce((sum, value) => sum + Math.abs(value), 0)
+    objective -= norm * 0.8
+    objective -= directionBias * 0.35
+    objective -= activeCount * 0.25
+
+    return { ...score, achievedCount, directionScore, objective, resourceNorm: norm }
+}
+
+function isIntegerControlScoreBetter(candidate, current) {
+    if (!current) return true
+    if (candidate.achievedCount !== current.achievedCount) return candidate.achievedCount > current.achievedCount
+    return candidate.objective > current.objective
+}
+
+function getIntegerCandidateValues(currentValue) {
+    const values = new Set([currentValue, 0, -10, -7, -5, -3, -2, -1, 1, 2, 3, 5, 7, 10])
+    for (let value = -10; value <= 10; value++) values.add(value)
+    return [...values]
+}
+
+function findIntegerControlProgram(targets, resources, totalSteps, targetFromStep, targetToStep, options = {}) {
+    const variables = getControlProgramVariables(resources, totalSteps)
+    const candidateMatrix = nodes.map(() => Array(totalSteps).fill(0))
+    const zeroScore = evaluateControlProgram(candidateMatrix, targets, targetFromStep, targetToStep, totalSteps)
+    const fromStep = Math.min(targetFromStep, totalSteps)
+    const toStep = Math.min(targetToStep, totalSteps)
+    const desiredDeltas = getControlProgramDesiredDeltas(zeroScore, targets, fromStep, toStep)
+    if (!variables.length || zeroScore.achievedCount === targets.length) {
+        return { impulseMatrix: candidateMatrix, score: scoreIntegerControlProgram(zeroScore, targets, targetFromStep, targetToStep, totalSteps, candidateMatrix, desiredDeltas) }
+    }
+
+    const baselineDeltas = targets.map(target => getControlProgramTargetDelta(zeroScore.resultValues, target, fromStep, toStep))
+    const targetVector = desiredDeltas.map((desiredDelta, index) => desiredDelta - baselineDeltas[index])
+
+    const influenceMatrix = targets.map(() => [])
+    variables.forEach((variable, variableIndex) => {
+        const unitMatrix = nodes.map(() => Array(totalSteps).fill(0))
+        unitMatrix[variable.nodeIndex][variable.columnIndex] = 1
+        const unitValues = calculateImpulseResultValues(unitMatrix, totalSteps)
+        targets.forEach((target, targetIndex) => {
+            const unitDelta = getControlProgramTargetDelta(unitValues, target, fromStep, toStep)
+            influenceMatrix[targetIndex][variableIndex] = unitDelta - baselineDeltas[targetIndex]
+        })
+    })
+
+    const solution = solveRidgeLeastSquares(influenceMatrix, targetVector, variables, {
+        regularization: options.regularization || 0.08
+    })
+    const multipliers = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5]
+    let bestMatrix = candidateMatrix.map(row => [...row])
+    let bestScore = scoreIntegerControlProgram(zeroScore, targets, targetFromStep, targetToStep, totalSteps, bestMatrix, desiredDeltas)
+
+    multipliers.forEach(multiplier => {
+        const matrix = nodes.map(() => Array(totalSteps).fill(0))
+        variables.forEach((variable, index) => {
+            matrix[variable.nodeIndex][variable.columnIndex] = clamp(Math.round((Number(solution[index]) || 0) * multiplier), -10, 10)
+        })
+        const score = evaluateControlProgram(matrix, targets, targetFromStep, targetToStep, totalSteps)
+        const scored = scoreIntegerControlProgram(score, targets, targetFromStep, targetToStep, totalSteps, matrix, desiredDeltas)
+        if (isIntegerControlScoreBetter(scored, bestScore)) {
+            bestMatrix = matrix
+            bestScore = scored
+        }
+    })
+
+    let improved = true
+    let passes = 0
+    const maxPasses = Math.max(1, Number(options.maxPasses) || 5)
+    while (improved && passes < maxPasses) {
+        improved = false
+        passes++
+        variables.forEach(variable => {
+            const currentValue = bestMatrix[variable.nodeIndex][variable.columnIndex]
+            let localBestValue = currentValue
+            let localBestScore = bestScore
+
+            getIntegerCandidateValues(currentValue).forEach(value => {
+                if (value === currentValue) return
+                const matrix = bestMatrix.map(row => [...row])
+                matrix[variable.nodeIndex][variable.columnIndex] = value
+                const score = evaluateControlProgram(matrix, targets, targetFromStep, targetToStep, totalSteps)
+                const scored = scoreIntegerControlProgram(score, targets, targetFromStep, targetToStep, totalSteps, matrix, desiredDeltas)
+                if (isIntegerControlScoreBetter(scored, localBestScore)) {
+                    localBestValue = value
+                    localBestScore = scored
+                }
+            })
+
+            if (localBestValue !== currentValue) {
+                bestMatrix[variable.nodeIndex][variable.columnIndex] = localBestValue
+                bestScore = localBestScore
+                improved = true
+            }
+        })
+    }
+
+    return { impulseMatrix: bestMatrix, score: bestScore }
+}
+
+function findControlProgram(targets, resources, totalSteps, targetFromStep, targetToStep, options = {}) {
+    return findIntegerControlProgram(targets, resources, totalSteps, targetFromStep, targetToStep, options)
+}
+
+function getControlProgramVerification() {
+    if (!lastControlProgramCheck || !resValues.length || !resValues[0]?.length) return null
+
+    const fromStep = Math.min(lastControlProgramCheck.targetFromStep, resValues[0].length)
+    const toStep = Math.min(lastControlProgramCheck.targetToStep, resValues[0].length)
+    let achievedCount = 0
+    const rows = lastControlProgramCheck.targets.map(target => {
+        const node = nodesNumberNodeMap.get(target.index)
+        const values = resValues[target.index] || []
+        const fallbackValue = Number(nodesNumberNodeMap.get(target.index)?.value ?? 0)
+        const startValue = Number.isFinite(Number(values[fromStep - 1])) ? Number(values[fromStep - 1]) : fallbackValue
+        const endValue = Number.isFinite(Number(values[toStep - 1])) ? Number(values[toStep - 1]) : startValue
+        const delta = Number(endValue) - Number(startValue)
+        const achieved = target.direction > 0 ? delta > 0 : delta < 0
+        if (achieved) achievedCount++
+
+        return {
+            nodeName: node?.text ?? "Вершина",
+            direction: target.direction,
+            directionText: target.direction > 0 ? "рост" : "снижение",
+            startValue,
+            endValue,
+            delta,
+            achieved
+        }
+    })
+
+    return {
+        fromStep,
+        toStep,
+        rows,
+        achievedCount,
+        totalTargets: lastControlProgramCheck.targets.length,
+        allAchieved: achievedCount === lastControlProgramCheck.targets.length
+    }
+}
+
+function renderControlProgramResult() {
+    const container = document.getElementById("controlProgramResult")
+    if (!container) return
+
+    if (!lastControlProgramCheck) {
+        lastControlProgramVerification = null
+        container.innerHTML = ""
+        return
+    }
+
+    if (!resValues.length || !resValues[0]?.length) {
+        lastControlProgramVerification = null
+        container.innerHTML = `
+            <div class="control-program-result-title">Проверка программы управления</div>
+            <div class="control-program-result-note">Проверка появится после выполнения шагов.</div>
+        `
+        return
+    }
+
+    const verification = getControlProgramVerification()
+    lastControlProgramVerification = verification
+    const fromStep = verification.fromStep
+    const toStep = verification.toStep
+    const formatResultNumber = value => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "-"
+    const rows = verification.rows.map(row => {
+        const statusText = row.achieved ? "достигнуто" : "не достигнуто"
+        const statusClass = row.achieved ? "control-program-result-ok" : "control-program-result-fail"
+
+        return `
+            <tr class="${statusClass}">
+                <td class="control-program-result-name" title="${row.nodeName}">${row.nodeName}</td>
+                <td>${row.directionText}</td>
+                <td>${formatResultNumber(row.startValue)}</td>
+                <td>${formatResultNumber(row.endValue)}</td>
+                <td>${formatResultNumber(row.delta)}</td>
+                <td>${statusText}</td>
+            </tr>
+        `
+    }).join("")
+    const summaryClass = verification.allAchieved ? "control-program-summary-ok" : "control-program-summary-fail"
+    const summaryText = verification.allAchieved
+        ? `Программа управления найдена: все цели достигнуты (${verification.achievedCount}/${verification.totalTargets}).`
+        : `Программа управления не найдена полностью: достигнуто ${verification.achievedCount}/${verification.totalTargets} целей.`
+
+    container.innerHTML = `
+        <div class="control-program-result-title">Проверка программы управления, шаги ${fromStep}-${toStep}</div>
+        <div class="control-program-summary ${summaryClass}">${summaryText}</div>
+        <div class="control-program-result-note">Проверка выполнена прямым расчетом модели: найденные импульсы подставлены в исходную модель, затем результат на выбранном отрезке сравнен с заданной тенденцией.</div>
+        <table class="control-program-result-table">
+            <thead>
+                <tr>
+                    <th>Цель</th>
+                    <th>Требуется</th>
+                    <th>Шаг ${fromStep}</th>
+                    <th>Шаг ${toStep}</th>
+                    <th>Δ</th>
+                    <th>Итог</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `
+}
+
 function applyControlProgram() {
-    const { targetSteps, targets, resources } = getControlProgramSelections()
+    const { targetFromStep, targetToStep, targets, resources, manualMode } = getControlProgramSelections()
 
     if (!targets.length) {
         document.getElementById("controlProgramStatus").textContent = "Нужно выбрать хотя бы одну целевую вершину."
@@ -1335,43 +1855,287 @@ function applyControlProgram() {
     }
 
     const maxControlStep = Math.max(...resources.flatMap(resource => resource.steps))
-    const totalSteps = Math.max(targetSteps, maxControlStep)
+    const totalSteps = Math.max(targetToStep, maxControlStep)
     setImpulseSteps(totalSteps)
+    clearImpulseInputs()
+    currImpulseStep = 0
+    resValues = []
+    lastControlProgramCheck = {
+        targetFromStep,
+        targetToStep,
+        targets: targets.map(target => ({ ...target }))
+    }
+    lastControlProgramSearch = {
+        targetFromStep,
+        targetToStep,
+        resources: resources.map(resource => ({ ...resource, steps: [...resource.steps] })),
+        totalSteps,
+        maxControlStep,
+        manualMode
+    }
+    controlProgramAutoRecalculated = false
+    document.getElementById("impulseStepSpan").innerHTML = ""
+    document.getElementById("impulseChartContainer").style.display = "none"
+    renderControlProgramResult()
+
+    selectedImpulseNodesIds = [...new Set(resources.map(resource => resource.index))]
+    showSelectedImpulseRows()
+
+    let searchResult = null
+    if (manualMode) {
+        putControlProgramMatrixToInputs(nodes.map(() => Array(totalSteps).fill(0)))
+    } else {
+        searchResult = findControlProgram(targets, resources, totalSteps, targetFromStep, targetToStep)
+        putControlProgramMatrixToInputs(searchResult.impulseMatrix)
+    }
+
+    document.getElementById("chartStepFromInput").value = targetFromStep
+    document.getElementById("chartStepToInput").value = targetToStep
+    updateImpulseControlsVisibility()
+    document.getElementById("impulseSubmitButton").style.visibility = "hidden"
+    document.getElementById("doImpuleStepContainer").style.visibility = "visible"
+    document.getElementById("doImpulseStepButton").style.visibility = "visible"
+    document.getElementById("impulseStepSpan").innerHTML = manualMode
+        ? "ручной ввод: измените импульсы в таблице и выполните шаги"
+        : "автоматически подставлены целые импульсы от -10 до 10"
+    document.getElementById("controlProgramStatus").textContent = manualMode
+        ? `Подготовлен ручной ввод: ресурсов ${resources.length}, шагов управления ${maxControlStep}, отрезок графика ${targetFromStep}-${targetToStep}.`
+        : `Подставлено: ресурсов ${resources.length}, шагов управления ${maxControlStep}, отрезок графика ${targetFromStep}-${targetToStep}. Достигнуто целей при целочисленном поиске: ${searchResult.score.achievedCount}/${targets.length}.`
+    closeControlProgramForm()
+    updateResizeHandles()
+}
+
+function putControlProgramMatrixToInputs(matrix) {
+    const normalizedMatrix = matrix.map(row => row.map(value => clamp(Math.round(Number(value) || 0), -10, 10)))
+    normalizedMatrix.forEach(row => {
+        while (row.length < impulseSteps) row.push(0)
+    })
+    impulseMatrix = normalizedMatrix
+    normalizedMatrix.forEach((row, nodeIndex) => {
+        row.forEach((value, columnIndex) => {
+            const input = document.getElementById("impulseInput:"+nodeIndex+"-"+columnIndex)
+            if (input) input.value = value
+        })
+    })
+}
+
+function syncImpulseMatrixFromInputs() {
+    impulseMatrix = []
+    for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
+        const row = []
+        for (let stepIndex = 0; stepIndex < impulseSteps; stepIndex++) {
+            const input = document.getElementById("impulseInput:"+nodeIndex+"-"+stepIndex)
+            row.push(clamp(Math.round(Number(input?.value) || 0), -10, 10))
+        }
+        impulseMatrix.push(row)
+    }
+}
+
+function resetControlProgramRun() {
     clearImpulseInputs()
     currImpulseStep = 0
     resValues = []
     document.getElementById("impulseStepSpan").innerHTML = ""
     document.getElementById("impulseChartContainer").style.display = "none"
+    renderControlProgramResult()
+    closeControlAcceptanceWindow()
+}
 
-    fillNodeMatrix()
-    const influenceMatrix = transpose(nodeMatrix)
+function recalculateControlProgram(searchMultiplier = 2) {
+    if (!lastControlProgramCheck || !lastControlProgramSearch) return false
 
+    const { targetFromStep, targetToStep, resources, totalSteps } = lastControlProgramSearch
+    const searchResult = findControlProgram(
+        lastControlProgramCheck.targets,
+        resources,
+        totalSteps,
+        targetFromStep,
+        targetToStep,
+        { searchMultiplier, maxPasses: 6 }
+    )
+    resetControlProgramRun()
+    putControlProgramMatrixToInputs(searchResult.impulseMatrix)
     selectedImpulseNodesIds = [...new Set(resources.map(resource => resource.index))]
     showSelectedImpulseRows()
-
-    resources.forEach(resource => {
-        resource.steps.forEach(step => {
-            const columnIndex = step - 1
-            if (columnIndex < 0 || columnIndex >= impulseSteps) return
-
-            let score = 0
-            targets.forEach(target => {
-                const power = targetSteps - step
-                if (power < 0) return
-                const influence = matrixPower(influenceMatrix, power)[target.index][resource.index]
-                score += target.direction * Number(influence)
-            })
-
-            const input = document.getElementById("impulseInput:"+resource.index+"-"+columnIndex)
-            if (input) input.value = score > 0 ? resource.strength : score < 0 ? -resource.strength : 0
-        })
-    })
-
-    document.getElementById("chartStepFromInput").value = 1
-    document.getElementById("chartStepToInput").value = targetSteps
     updateImpulseControlsVisibility()
     document.getElementById("controlProgramStatus").textContent =
-        `Подставлено: ресурсов ${resources.length}, шагов управления ${maxControlStep}, шагов графика ${targetSteps}.`
+        `Выполнен перерасчет программы управления. Достигнуто целей при поиске: ${searchResult.score.achievedCount}/${lastControlProgramCheck.targets.length}.`
+    return true
+}
+
+function getControlProgramImpulseMatrixFromInputs() {
+    return nodes.map((node, nodeIndex) => {
+        const row = []
+        for (let stepIndex = 0; stepIndex < impulseSteps; stepIndex++) {
+            const input = document.getElementById("impulseInput:"+nodeIndex+"-"+stepIndex)
+            row.push(Number(input?.value) || 0)
+        }
+        return row
+    })
+}
+
+function downloadBlob(content, filename, type) {
+    const blob = new Blob([content], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.style.display = "none"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+}
+
+function saveAcceptedControlProgramToFile() {
+    const payload = {
+        createdAt: new Date().toISOString(),
+        graph: serializeGraph(),
+        targetInterval: lastControlProgramCheck ? {
+            fromStep: lastControlProgramCheck.targetFromStep,
+            toStep: lastControlProgramCheck.targetToStep
+        } : null,
+        targets: lastControlProgramCheck?.targets || [],
+        resources: lastControlProgramSearch?.resources || [],
+        impulseMatrix: getControlProgramImpulseMatrixFromInputs(),
+        resultValues: resValues,
+        verification: lastControlProgramVerification || getControlProgramVerification()
+    }
+    downloadBlob(JSON.stringify(payload, null, 2), "control-program.json", "application/json")
+}
+
+function saveCurrentProgramImage() {
+    const sourceSvg = document.querySelector("#impulseChartContainer svg") || document.querySelector("#container svg")
+    if (!sourceSvg) return
+
+    const clonedSvg = sourceSvg.cloneNode(true)
+    const box = sourceSvg.getBoundingClientRect()
+    const width = Math.max(Math.ceil(box.width), Number(sourceSvg.getAttribute("width")) || 900)
+    const height = Math.max(Math.ceil(box.height), Number(sourceSvg.getAttribute("height")) || 600)
+    clonedSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg")
+    clonedSvg.setAttribute("width", width)
+    clonedSvg.setAttribute("height", height)
+
+    const svgText = new XMLSerializer().serializeToString(clonedSvg)
+    const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(svgBlob)
+    const image = new Image()
+    image.onload = () => {
+        const canvas = document.createElement("canvas")
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext("2d")
+        context.fillStyle = "#ffffff"
+        context.fillRect(0, 0, width, height)
+        context.drawImage(image, 0, 0, width, height)
+        URL.revokeObjectURL(url)
+        canvas.toBlob(blob => {
+            if (!blob) return
+            const pngUrl = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = pngUrl
+            a.download = "control-program.png"
+            a.style.display = "none"
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(pngUrl)
+        }, "image/png")
+    }
+    image.src = url
+}
+
+function renderControlAcceptanceWindow(message) {
+    const verification = lastControlProgramVerification || getControlProgramVerification()
+    const status = document.getElementById("controlAcceptanceStatus")
+    const details = document.getElementById("controlAcceptanceDetails")
+    renderControlAcceptanceActions()
+    if (!verification) {
+        status.className = "control-acceptance-status control-acceptance-status-warn"
+        status.textContent = "Проверка еще не выполнена."
+        details.innerHTML = ""
+        return
+    }
+
+    status.className = verification.allAchieved
+        ? "control-acceptance-status control-acceptance-status-ok"
+        : "control-acceptance-status control-acceptance-status-fail"
+    status.textContent = message || (verification.allAchieved
+        ? `Все цели достигнуты (${verification.achievedCount}/${verification.totalTargets}).`
+        : `Проверка не сошлась: достигнуто ${verification.achievedCount}/${verification.totalTargets} целей.`)
+
+    const rows = verification.rows.map(row => `
+        <tr class="${row.achieved ? "control-program-result-ok" : "control-program-result-fail"}">
+            <td>${row.nodeName}</td>
+            <td>${row.directionText}</td>
+            <td>${Number(row.delta).toFixed(2)}</td>
+            <td>${row.achieved ? "достигнуто" : "не достигнуто"}</td>
+        </tr>
+    `).join("")
+    details.innerHTML = `
+        <div class="control-acceptance-meta">Отрезок проверки: шаги ${verification.fromStep}-${verification.toStep}</div>
+        <table class="control-acceptance-table">
+            <thead>
+                <tr><th>Цель</th><th>Тенденция</th><th>Δ</th><th>Итог</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `
+}
+
+function renderControlAcceptanceActions() {
+    const isAccepted = controlProgramAcceptanceDecision === "accepted"
+    const isRejected = controlProgramAcceptanceDecision === "rejected"
+    document.getElementById("controlAcceptanceAcceptButton").style.display = controlProgramAcceptanceDecision ? "none" : "inline-block"
+    document.getElementById("controlAcceptanceRejectButton").style.display = controlProgramAcceptanceDecision ? "none" : "inline-block"
+    document.querySelectorAll(".control-acceptance-after-accept").forEach(button => {
+        button.style.display = isAccepted ? "inline-block" : "none"
+    })
+    document.querySelectorAll(".control-acceptance-after-reject").forEach(button => {
+        button.style.display = isRejected ? "inline-block" : "none"
+    })
+    document.querySelectorAll(".control-acceptance-after-decision").forEach(button => {
+        button.style.display = controlProgramAcceptanceDecision ? "inline-block" : "none"
+    })
+}
+
+function openControlAcceptanceWindow(message) {
+    controlProgramAcceptanceDecision = null
+    renderControlAcceptanceWindow(message)
+    document.getElementById("controlAcceptanceForm").style.display = "block"
+    document.getElementById("main").style.opacity = 0.45
+}
+
+function closeControlAcceptanceWindow() {
+    document.getElementById("controlAcceptanceForm").style.display = "none"
+    document.getElementById("main").style.opacity = 1
+}
+
+function runAllImpulseStepsWithoutAcceptance() {
+    while (runVisibleImpulseStep()) {
+    }
+}
+
+function finishControlProgramExecution() {
+    if (!lastControlProgramCheck) return
+    renderControlProgramResult()
+    let verification = lastControlProgramVerification || getControlProgramVerification()
+
+    if (verification && !verification.allAchieved && !controlProgramAutoRecalculated) {
+        controlProgramAutoRecalculated = true
+        const recalculated = recalculateControlProgram(2)
+        if (recalculated) {
+            runAllImpulseStepsWithoutAcceptance()
+            renderControlProgramResult()
+            verification = lastControlProgramVerification || getControlProgramVerification()
+            openControlAcceptanceWindow(verification?.allAchieved
+                ? "После автоматического перерасчета программа сошлась."
+                : "Автоматический перерасчет выполнен, но часть целей все еще не достигнута.")
+            return
+        }
+    }
+
+    openControlAcceptanceWindow()
 }
 
 function ensureChartNodeFilterContainer() {
@@ -1491,6 +2255,7 @@ function renderImpulseChart() {
     document.getElementById("impulseChartContainer").style.display = "flex"
     createChart("impulseChartContainer", chartMatrix, chartNodeNames, from, selectedIndexes, chartNodeRoles)
     installResizablePanels()
+    updateResizeHandles()
 }
 
 function keepCurrentImpulseStepVisible() {
@@ -1662,12 +2427,12 @@ function getColumnMatrix(matrix, columnNumber){
     return(result)
 }
 
-//DO IMPULSE STEP BUTTON
-doImpulseStepButton.addEventListener('click', () => {
+function runVisibleImpulseStep() {
     if(currImpulseStep==impulseSteps) {
         document.getElementById("impulseStepSpan").innerHTML = "все шаги выполнены"
-        return
+        return false
     }
+    syncImpulseMatrixFromInputs()
     doImpulseStep();
     const elements = document.querySelectorAll(".impulseColumn-"+currImpulseStep);
     if(currImpulseStep!=0){
@@ -1683,12 +2448,26 @@ doImpulseStepButton.addEventListener('click', () => {
     document.getElementById("impulseStepSpan").innerHTML = "номер текущего шага: " + currImpulseStep
     keepCurrentImpulseStepVisible()
     renderImpulseChart()
+    renderControlProgramResult()
+    return true
+}
+
+//DO IMPULSE STEP BUTTON
+doImpulseStepButton.addEventListener('click', () => {
+    if (runVisibleImpulseStep() && currImpulseStep === impulseSteps) {
+        finishControlProgramExecution()
+    }
 });
+
+doAllImpulseStepsButton.addEventListener('click', () => {
+    runAllImpulseStepsWithoutAcceptance()
+    finishControlProgramExecution()
+})
 //SUBMIT EDIT NETWORK BUTTON
 submitBuiltNetworkButton.addEventListener('click', ()=>{
     statusFlag=statusFlagConstants.impulseEditing
     setStatusText()
-    document.getElementById("impulseEditor").style.display = "block"
+    document.getElementById("impulseEditor").style.display = "flex"
 
     document.getElementById("network-edit-menu").style.visibility = "hidden"
     document.getElementById("userTopMenu").style.display = "none"
@@ -1697,9 +2476,9 @@ submitBuiltNetworkButton.addEventListener('click', ()=>{
     document.getElementById("controlProgramButton").style.display = "block"
     document.getElementById("totalImpulseStepsSpan").innerHTML = "Количество шагов: "+impulseSteps;
     document.getElementById("impulseStepsInput").value = impulseSteps
-    document.getElementById("container").style.width = "60%"
 
     resetImpulseEditing()
+    applyDefaultImpulsePanelLayout()
 })
 
 //RETURN EDIT BUTTON
@@ -1722,6 +2501,7 @@ returnEditNetworkButton.addEventListener('click', ()=>{
     const chartNodeFilterContainer = document.getElementById("chartNodeFilterContainer")
     if (chartNodeFilterContainer) chartNodeFilterContainer.innerHTML = ""
     isChartNodeFilterOpen = false
+    closeControlAcceptanceWindow()
     closeControlProgramForm()
 })
 
@@ -1872,7 +2652,7 @@ fileInput.addEventListener("change", function(event) {
                 //links.forEach(element => links.pop(element))
                 //json.links.forEach(element => links.push(element))
                 links = json.links.map(d => ({ ...d }));
-                nodes = json.nodes.map(d => ({ ...d }));
+                nodes = json.nodes.map(d => normalizeNodeRole({ ...d }));
                 //nodes = json.nodes;
                 //links = json.links;
                 reRender();
@@ -1949,6 +2729,7 @@ function resetImpulseEditing(){
     document.getElementById("impulseSubmitButton").style.visibility = "hidden"
     if (document.getElementById("impulseAddStepButton")) document.getElementById("impulseAddStepButton").style.visibility = "visible"
     document.getElementById("doImpulseStepButton").style.visibility = "hidden"
+    document.getElementById("doImpuleStepContainer").style.visibility = "hidden"
     document.getElementById("impulseStepSpan").innerHTML = "номер текущего шага: 0"
     document.getElementById("impulseInputContainer").innerHTML = ""
     document.getElementById("impulseChartContainer").style.display = "none"
@@ -1958,6 +2739,15 @@ function resetImpulseEditing(){
     selectedChartNodeIds.clear()
     chartNodeFilterInitialized = false
     isChartNodeFilterOpen = false
+    const chartNodeFilterContainer = document.getElementById("chartNodeFilterContainer")
+    if (chartNodeFilterContainer) chartNodeFilterContainer.innerHTML = ""
+    lastControlProgramCheck = null
+    lastControlProgramSearch = null
+    lastControlProgramVerification = null
+    controlProgramAutoRecalculated = false
+    controlProgramAcceptanceDecision = null
+    closeControlAcceptanceWindow()
+    renderControlProgramResult()
     renderChartNodeFilter()
 }
 
@@ -2011,6 +2801,7 @@ function setRightColumn(left, width) {
         panel.style.left = `${Math.round(left)}px`
         panel.style.width = `${Math.round(width)}px`
     })
+    updateResizeHandles()
 }
 
 function clamp(value, min, max) {
@@ -2076,6 +2867,7 @@ function applyVerticalPanelLayout(activePanel, startRect, dy) {
         chartPanel.style.height = `${Math.round(nextChartHeight)}px`
         editorPanel.style.top = `${Math.round(nextEditorTop)}px`
         editorPanel.style.height = `${Math.round(nextEditorHeight)}px`
+        updateResizeHandles()
 
         return nextChartHeight
     }
@@ -2119,6 +2911,7 @@ function addResizeHandle(panel, className, directions) {
             if (!directions.includes("left")) panel.style.width = `${Math.round(nextWidth)}px`
             if (directions.includes("bottom")) panel.style.height = `${Math.round(nextHeight)}px`
             if (directions.includes("left")) panel.style.left = `${Math.round(nextLeft)}px`
+            updateResizeHandles()
         }
 
         function onMouseUp() {
@@ -2131,6 +2924,78 @@ function addResizeHandle(panel, className, directions) {
     })
 
     panel.appendChild(handle)
+    updateResizeHandles()
+}
+
+function updateResizeHandles() {
+    document.querySelectorAll(".resize-handle").forEach(handle => {
+        const panel = handle.parentElement
+        if (!panel || !isPanelVisible(panel)) {
+            handle.style.display = "none"
+            return
+        }
+
+        const rect = panel.getBoundingClientRect()
+        handle.style.display = "block"
+        if (handle.classList.contains("resize-handle-right")) {
+            handle.style.left = `${Math.round(rect.right - 7)}px`
+            handle.style.top = `${Math.round(rect.top + rect.height / 2 - 24)}px`
+        } else if (handle.classList.contains("resize-handle-left")) {
+            handle.style.left = `${Math.round(rect.left)}px`
+            handle.style.top = `${Math.round(rect.top + rect.height / 2 - 24)}px`
+        } else if (handle.classList.contains("resize-handle-bottom-right")) {
+            handle.style.left = `${Math.round(rect.right - 16)}px`
+            handle.style.top = `${Math.round(rect.bottom - 16)}px`
+        } else if (handle.classList.contains("resize-handle-bottom-left")) {
+            handle.style.left = `${Math.round(rect.left)}px`
+            handle.style.top = `${Math.round(rect.bottom - 16)}px`
+        } else if (handle.classList.contains("resize-handle-bottom")) {
+            handle.style.left = `${Math.round(rect.left + rect.width / 2 - 24)}px`
+            handle.style.top = `${Math.round(rect.bottom - 7)}px`
+        }
+    })
+}
+
+function getWorkspaceTopOffset() {
+    const topMenu = document.getElementById("top-menu")
+    const menuBottom = topMenu ? topMenu.getBoundingClientRect().bottom : 0
+    return Math.ceil(menuBottom + panelViewportPadding)
+}
+
+function applyDefaultImpulsePanelLayout() {
+    const graphPanel = document.getElementById("container")
+    const chartPanel = document.getElementById("impulseChartContainer")
+    const editorPanel = document.getElementById("impulseEditor")
+    if (!graphPanel || !chartPanel || !editorPanel) return
+
+    const top = getWorkspaceTopOffset()
+    const bottom = panelViewportPadding
+    const left = panelViewportPadding
+    const viewportRight = window.innerWidth - panelViewportPadding
+    const availableHeight = Math.max(
+        getPanelMinSize(graphPanel, "minHeight", 280),
+        window.innerHeight - top - bottom
+    )
+    const rightWidth = Math.max(getRightColumnMinWidth(), Math.round((viewportRight - left) * 0.36))
+    const rightLeft = viewportRight - rightWidth
+    const graphWidth = Math.max(getPanelMinSize(graphPanel, "minWidth", 280), rightLeft - left - panelLayoutGap)
+    const splitHeight = Math.max(180, Math.floor((availableHeight - panelLayoutGap) / 2))
+
+    graphPanel.style.left = `${left}px`
+    graphPanel.style.top = `${top}px`
+    graphPanel.style.width = `${graphWidth}px`
+    graphPanel.style.height = `${availableHeight}px`
+
+    chartPanel.style.left = `${rightLeft}px`
+    chartPanel.style.top = `${top}px`
+    chartPanel.style.width = `${rightWidth}px`
+    chartPanel.style.height = `${splitHeight}px`
+
+    editorPanel.style.left = `${rightLeft}px`
+    editorPanel.style.top = `${top + splitHeight + panelLayoutGap}px`
+    editorPanel.style.width = `${rightWidth}px`
+    editorPanel.style.height = `${availableHeight - splitHeight - panelLayoutGap}px`
+    updateResizeHandles()
 }
 
 function installResizablePanels() {
@@ -2158,3 +3023,5 @@ function installResizablePanels() {
 }
 
 installResizablePanels()
+window.addEventListener("resize", updateResizeHandles)
+window.addEventListener("scroll", updateResizeHandles)

@@ -16,7 +16,7 @@
             <span class="status-label">Режим</span>
             <span id="status" class="status-value">status</span>
         </div>
-        <button id="returnEditNetworkButton">задать программу управления</button>
+        <button id="returnEditNetworkButton">построение графа</button>
         <button id="controlProgramButton">поиск программы управления</button>
         <div id="network-edit-menu">
             <button id="addNewNodeButton">
@@ -92,9 +92,16 @@
         <br>
         test button
     </button>
-    <div id="container"></div>
+    <div id="container">
+        <div id="graphZoomControls" class="graph-zoom-controls">
+            <button id="graphZoomOutButton" type="button" title="Отдалить граф">−</button>
+            <button id="graphZoomFitButton" type="button" title="Вернуть граф в поле зрения">по центру</button>
+            <button id="graphZoomInButton" type="button" title="Приблизить граф">+</button>
+        </div>
+    </div>
     <div id="impulseChartContainer"></div>
     <div class="impulseEditor" id="impulseEditor">
+        <div class="impulseEditor-title">Ввод импульсов вручную</div>
         <div class="impulseEditor-header">
             <span id="totalImpulseStepsSpan">Количество шагов: </span>
             <input id="impulseStepsInput" type="number" min="0" value="0" title="Количество шагов">

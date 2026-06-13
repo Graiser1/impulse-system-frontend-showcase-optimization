@@ -241,6 +241,19 @@ For npm in PowerShell, prefer `npm.cmd` because `npm.ps1` may be blocked by Exec
 - The label `вернуться к редактированию графа` was changed to `задать программу управления`.
 - The control-program popup now closes automatically after applying a program.
 
+### June 13 teacher feedback refinements
+
+- Renamed the top-panel return/edit button from `задать программу управления` to `построение графа` to avoid confusing it with the separate control-program search workflow.
+- Added map-like navigation for the main graph panel:
+- mouse wheel zooms the graph in and out around the cursor.
+- dragging the empty graph canvas pans the graph.
+- node dragging still works independently from canvas panning.
+- added compact graph navigation buttons: `−`, `по центру`, `+`.
+- `по центру` fits all current vertices back into the visible graph panel.
+- graph auto-fit now runs after the initial render, after entering impulse mode, and after returning to graph construction mode.
+- Added a compact title label `Ввод импульсов вручную` to the impulse editor panel so the manual impulse table is explicitly identified for users.
+- Changed the graph container overflow from scrollbars to hidden because graph navigation is now handled through zoom/pan controls.
+
 ## Current Git State
 
 Important recent commits:

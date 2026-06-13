@@ -278,7 +278,7 @@ var svg = d3.create("svg")
     .attr("width", width)
     .attr("height", height)
     .attr("viewBox", [0, 0, width, height])
-    .attr("style", "max-width: 100%; height: 98%; width: 98%")
+    .attr("style", "max-width: 100%; height: 100%; width: 100%")
     // .on("click", clicked)
     .on("click", svgClicked)
 
@@ -302,6 +302,70 @@ function createArrowMarker(id, markerColor) {
 createArrowMarker("arrowhead-positive", "green")
 createArrowMarker("arrowhead-negative", "red")
 
+var currentGraphTransform = d3.zoomIdentity
+var graphViewport = svg.append("g")
+    .attr("class", "graph-viewport")
+
+function handleGraphZoom(event) {
+    currentGraphTransform = event.transform
+    graphViewport.attr("transform", currentGraphTransform)
+}
+
+var graphZoom = d3.zoom()
+    .scaleExtent([0.25, 4])
+    .translateExtent([[-width * 4, -height * 4], [width * 5, height * 5]])
+    .extent([[0, 0], [width, height]])
+    .on("zoom", handleGraphZoom)
+
+svg.call(graphZoom)
+    .on("dblclick.zoom", null)
+
+function zoomGraphBy(multiplier) {
+    svg.transition()
+        .duration(160)
+        .call(graphZoom.scaleBy, multiplier)
+}
+
+function fitGraphToView(duration = 180) {
+    if (!nodes.length) {
+        svg.transition()
+            .duration(duration)
+            .call(graphZoom.transform, d3.zoomIdentity)
+        return
+    }
+
+    const padding = Math.max(nodeRadius * 2, 90)
+    const minX = d3.min(nodes, node => Number.isFinite(node.x) ? node.x : width / 2) - padding
+    const maxX = d3.max(nodes, node => Number.isFinite(node.x) ? node.x : width / 2) + padding
+    const minY = d3.min(nodes, node => Number.isFinite(node.y) ? node.y : height / 2) - padding
+    const maxY = d3.max(nodes, node => Number.isFinite(node.y) ? node.y : height / 2) + padding
+    const graphWidth = Math.max(1, maxX - minX)
+    const graphHeight = Math.max(1, maxY - minY)
+    const nextScale = clamp(Math.min(width / graphWidth, height / graphHeight), 0.25, 1.6)
+    const nextX = width / 2 - nextScale * (minX + graphWidth / 2)
+    const nextY = height / 2 - nextScale * (minY + graphHeight / 2)
+    const nextTransform = d3.zoomIdentity.translate(nextX, nextY).scale(nextScale)
+
+    svg.transition()
+        .duration(duration)
+        .call(graphZoom.transform, nextTransform)
+}
+
+document.getElementById("graphZoomInButton")?.addEventListener("click", event => {
+    event.stopPropagation()
+    zoomGraphBy(1.25)
+})
+
+document.getElementById("graphZoomOutButton")?.addEventListener("click", event => {
+    event.stopPropagation()
+    zoomGraphBy(0.8)
+})
+
+document.getElementById("graphZoomFitButton")?.addEventListener("click", event => {
+    event.stopPropagation()
+    fitGraphToView()
+})
+
 /*
 svg.append("defs").append("marker")
     .attr("id", "arrowhead")
@@ -318,7 +382,7 @@ svg.append("defs").append("marker")
 */
 
 // Добавляем линии для рёбер
-var link = svg.append("g")
+var link = graphViewport.append("g")
     .selectAll("line")
     .data(links)
     .join("line")
@@ -362,7 +426,7 @@ function bindLinkEvents(selection) {
         .on("dblclick", linkDoubleClicked);
 }
 
-var node = svg.append("g")
+var node = graphViewport.append("g")
     .selectAll()
     .data(nodes)
     .join("circle")
@@ -396,7 +460,7 @@ function updateNodeView(){
 }
 
 // Добавляем группу для текста
-var linkText = svg.append("g")
+var linkText = graphViewport.append("g")
     .selectAll("text")
     .data(links)
     .join("text")
@@ -414,7 +478,7 @@ function updateLinkTextView(){
 }
 
 // Добавляем группу для текста
-var circlesText = svg.append("g")
+var circlesText = graphViewport.append("g")
     .selectAll("text")
     .data(nodes)
     .join("text")
@@ -450,7 +514,7 @@ function updateCirclesTextView() {
 }
 
 // Добавляем группу для текста
-var circlesValueText = svg.append("g")
+var circlesValueText = graphViewport.append("g")
     .selectAll("text")
     .data(nodes)
     .join("text")
@@ -660,6 +724,8 @@ function clicked(event) {
 */
 
 function svgClicked(event) {
+    if (event.defaultPrevented) return
+    if (event.target.closest?.(".graph-zoom-controls")) return
     if (statusFlag == statusFlagConstants.addNodeStart) {
         mousemoved.call(this, event);
         spawn({ id: uuidv4(), group: 1, text:"New Node",  x: mouse.x, y: mouse.y , value: 1});
@@ -747,7 +813,8 @@ function nodeDoubleClicked(event) {
 }
 
 function mousemoved(event) {
-    const [x, y] = d3.pointer(event);
+    const pointerTarget = graphViewport ? graphViewport.node() : svg.node()
+    const [x, y] = d3.pointer(event, pointerTarget);
     mouse = { x, y };
     if (!isLayoutLocked) {
         simulation.alpha(0.3).restart();
@@ -836,6 +903,7 @@ addNodeButton.addEventListener('click', () => {
 });*/
 
 container.append(svg.node())
+requestAnimationFrame(() => fitGraphToView(0))
 //renderGraph()
 
 //ADD NEW NODE BUTTON LEGACY
@@ -2479,6 +2547,7 @@ submitBuiltNetworkButton.addEventListener('click', ()=>{
 
     resetImpulseEditing()
     applyDefaultImpulsePanelLayout()
+    setTimeout(() => fitGraphToView(), 0)
 })
 
 //RETURN EDIT BUTTON
@@ -2503,6 +2572,7 @@ returnEditNetworkButton.addEventListener('click', ()=>{
     isChartNodeFilterOpen = false
     closeControlAcceptanceWindow()
     closeControlProgramForm()
+    setTimeout(() => fitGraphToView(), 0)
 })
 
 //LOGIN BUTTON
